@@ -1,4 +1,3 @@
-import OpenAI from 'openai'
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0'
 import { draftFlood, floodReadings } from '../_shared/flood.ts'
 import { match } from '../_shared/match.ts'
@@ -7,23 +6,20 @@ const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Head
 const reply = (status: number, message: string) => Response.json({ message }, { headers, status })
 
 async function summarize(readings: ReturnType<typeof floodReadings>) {
-  // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API; draftFlood checks every quote it returns.
-  const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 15_000, maxRetries: 0 })
-  const completion = await dartmouth.chat.completions.create({
-    model: 'openai.gpt-6-luna',
-    max_completion_tokens: 600,
-    response_format: { type: 'json_schema', json_schema: { name: 'potential_incident', strict: true, schema: {
-      type: 'object', additionalProperties: false, required: ['summary', 'quotes'],
-      properties: { summary: { type: 'string' }, quotes: { type: 'array', items: { type: 'string' } } },
-    } } },
-    messages: [
-      { role: 'system', content: 'Summarize these synthetic flood readings for a Coordinator. Return only JSON with a short summary string and quotes, an array of one exact nonempty excerpt per reading in the supplied order.' },
-      { role: 'user', content: JSON.stringify([readings.gauge, readings.warning, readings.news].map(({ name, text }) => ({ name, text }))) },
-    ],
+  const key = Deno.env.get('ANTHROPIC_API_KEY')
+  if (!key) throw new Error('Claude is not configured')
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST', signal: AbortSignal.timeout(15000),
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5', max_tokens: 600,
+      system: 'Summarize these synthetic flood readings for a Coordinator. Return only JSON with a short summary string and quotes, an array of one exact nonempty excerpt per reading in the supplied order.',
+      messages: [{ role: 'user', content: JSON.stringify([readings.gauge, readings.warning, readings.news].map(({ name, text }) => ({ name, text }))) }],
+    }),
   })
-  const choice = completion.choices[0]
-  if (choice?.finish_reason !== 'stop' || !choice.message.content) throw new Error(`finish reason ${choice?.finish_reason}`)
-  return JSON.parse(choice.message.content)
+  if (!response.ok) throw new Error('Claude unavailable')
+  const result = await response.json()
+  return JSON.parse(result.content.filter((block: { type: string }) => block.type === 'text').map((block: { text: string }) => block.text).join(''))
 }
 
 async function verify(db: SupabaseClient, account: string, id: string, start: string, end: string | null) {
