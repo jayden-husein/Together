@@ -44,6 +44,7 @@ export default function Coordinator() {
                 <StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} />
               </div>
               <p className="lede">{c.incident}</p>
+              {c.explanation && <p>Matched stop: {c.explanation}</p>}
               {c.owner && <p className="lede">Claimed by {c.owner}</p>}
               <SourceLine source={SOURCE[c.status]} at={c.at} />
             </li>
