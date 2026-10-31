@@ -1,7 +1,7 @@
 import PotentialIncidentReview, { DismissalLine } from './PotentialIncidentReview'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, useDismissedIncidents, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
-import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, UrgencyTag, formatTime, statusClass } from '../ui'
+import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, Stops, UrgencyTag, formatTime, statusClass } from '../ui'
 
 // Queue order, so the summary reads the same way as the list below it.
 const STATUSES: CaseStatus[] = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved']
@@ -102,6 +102,12 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       <p className="lede">Notes stay with Coordinators. Emergency Contacts see only the outcome.</p>
       {c.explanation && <p>Matched stop: {c.explanation}</p>}
       {c.itineraryText && <blockquote aria-label="What the traveler pasted for their Itinerary">{c.itineraryText}</blockquote>}
+      {/* The Case stays open: the Coordinator decides whether the traveler is still at risk. */}
+      {c.correction && <section aria-label={c.correction.withdrawn ? 'Itinerary withdrawn' : 'Itinerary corrected'}>
+        <h3>{c.correction.withdrawn ? 'The traveler withdrew this Itinerary' : 'The traveler corrected this Itinerary'}</h3>
+        <p>Opened on:</p><Stops stops={c.correction.old} label="Stops the Case was opened on" />
+        <p>Now:</p><Stops stops={c.correction.new} label="Stops now" />
+      </section>}
       {/* Another Coordinator can take a Case over; claiming your own again would only repeat the entry. */}
       <EventForm legend="Owner" submitLabel={c.ownedByMe ? 'Unclaim' : c.owner ? 'Take over case' : 'Claim'} note="none" onSubmit={() => record({ action: c.ownedByMe ? 'released' : 'claimed' })}>
         <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>

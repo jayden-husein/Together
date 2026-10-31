@@ -1,11 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
-import type { CaseHistoryItem, CheckInRequest, ContactCase, IndividualUpdate, QueueCase } from '../lib/checkIns'
+import type { CaseHistoryItem, CheckInRequest, ConfirmedItinerary, ContactCase, IndividualUpdate, QueueCase } from '../lib/checkIns'
 import Coordinator from './Coordinator'
 import EmergencyContact from './EmergencyContact'
 import Traveler from './Traveler'
 
-const data = vi.hoisted(() => ({ myCheckIns: [] as CheckInRequest[], queue: [] as QueueCase[], updates: [] as IndividualUpdate[], contactCases: [] as ContactCase[], history: [] as CaseHistoryItem[] }))
+const data = vi.hoisted(() => ({ myCheckIns: [] as CheckInRequest[], queue: [] as QueueCase[], updates: [] as IndividualUpdate[], contactCases: [] as ContactCase[], history: [] as CaseHistoryItem[], itineraries: [] as ConfirmedItinerary[] | undefined, itinerariesError: null as string | null }))
+const reloadItineraries = vi.hoisted(() => vi.fn())
+const confirmItinerary = vi.hoisted(() => vi.fn(async () => {}))
 const recordCaseEvent = vi.hoisted(() => vi.fn(async () => {}))
 const submitCheckIn = vi.hoisted(() => vi.fn(async () => {}))
 const markRead = vi.hoisted(() => vi.fn(async () => {}))
@@ -22,7 +24,11 @@ vi.mock('../lib/checkIns', () => ({
   useIndividualUpdates: () => ({ data: data.updates, error: null }),
   useContactCases: () => ({ data: data.contactCases, error: null, reload: () => {} }),
   fileCantReach,
+  useMyItineraries: () => ({ data: data.itineraries, error: data.itinerariesError, reload: reloadItineraries }),
+  confirmItinerary,
+  AlreadyCorrectedError,
 }))
+const AlreadyCorrectedError = vi.hoisted(() => class extends Error {})
 
 afterEach(() => {
   cleanup()
@@ -30,6 +36,10 @@ afterEach(() => {
   markRead.mockClear()
   fileCantReach.mockClear()
   recordCaseEvent.mockClear()
+  reloadItineraries.mockClear()
+  confirmItinerary.mockReset()
+  data.itineraries = []
+  data.itinerariesError = null
 })
 
 const request = (reports: CheckInRequest['reports'] = []): CheckInRequest => ({ caseId: 'case-1', incident: 'Flash flood at Phantom Ranch', reports })
@@ -67,6 +77,149 @@ test('the traveler sees what they sent and when, newest first', () => {
   expect(within(items[0]).getByText('Water rising at camp')).toBeTruthy()
   expect(items[0].querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:12:00Z')
   expect(within(items[1]).getByText('Safe')).toBeTruthy()
+})
+
+const itinerary = (fields: Partial<ConfirmedItinerary> & Pick<ConfirmedItinerary, 'id' | 'at'>): ConfirmedItinerary =>
+  ({ stops: [{ place: 'Phantom Ranch', start: '2099-11-01T14:00:00Z', end: '2099-11-01T18:00:00Z' }], originalText: null, supersedes: null, ...fields })
+
+test('the traveler sees their current Itineraries, newest first, each with its stops in Grand Canyon time', () => {
+  data.itineraries = [
+    itinerary({ id: 'older', at: '2026-10-30T09:00:00Z', originalText: 'Phantom Ranch 7 to 11' }),
+    itinerary({ id: 'past', at: '2026-10-31T09:00:00Z', stops: [{ place: 'Mather Point', start: '2026-01-01T14:00:00Z', end: '2026-01-01T15:00:00Z' }] }),
+    itinerary({ id: 'newer', at: '2026-10-31T10:00:00Z', stops: [
+      { place: 'Mather Point', start: '2026-01-01T14:00:00Z', end: '2026-01-01T15:00:00Z' },
+      { place: 'Yavapai Point', start: '2099-11-02T17:30:00Z', end: '2099-11-02T19:00:00Z' },
+    ] }),
+  ]
+  render(<Traveler />)
+  const entries = within(screen.getByRole('list', { name: 'Your confirmed Itineraries' })).getAllByRole('listitem', { name: /Itinerary confirmed/ })
+  expect(entries).toHaveLength(2)
+  expect(entries.map(e => e.querySelector('.source-line time')?.getAttribute('dateTime'))).toEqual(['2026-10-31T10:00:00Z', '2026-10-30T09:00:00Z'])
+  // A started stop of a current Itinerary still shows; times are Grand Canyon local (UTC-7).
+  expect(within(entries[0]).getByText('Mather Point')).toBeTruthy()
+  expect(within(entries[0]).getByText('Yavapai Point').closest('li')?.textContent).toMatch(/10:30.*12:00/)
+  expect(entries[0].querySelector('.itinerary-map')).toBeTruthy()
+  // Pasted plans are collapsed, and only shown when there were plans.
+  expect(entries[0].querySelector('details')).toBeNull()
+  const plans = entries[1].querySelector('details')!
+  expect(plans.open).toBe(false)
+  expect(within(plans).getByText('Phantom Ranch 7 to 11')).toBeTruthy()
+})
+
+test('the Itinerary list has an empty state and an error state', () => {
+  data.itineraries = []
+  render(<Traveler />)
+  expect(screen.getByText(/No confirmed Itineraries/)).toBeTruthy()
+  cleanup()
+  data.itineraries = undefined
+  data.itinerariesError = 'Network down'
+  render(<Traveler />)
+  expect(screen.getByRole('alert').textContent).toMatch(/Network down/)
+})
+
+test('confirming an Itinerary refreshes the list', async () => {
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Add stop' }))
+  fireEvent.change(screen.getByLabelText('Place'), { target: { value: 'Phantom Ranch' } })
+  fireEvent.change(screen.getByLabelText('Arrival'), { target: { value: '2099-11-01T07:00' } })
+  fireEvent.change(screen.getByLabelText('Departure'), { target: { value: '2099-11-01T11:00' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
+  expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ stops: [{ place: 'Phantom Ranch', start: '2099-11-01T14:00:00.000Z', end: '2099-11-01T18:00:00.000Z' }] }))
+})
+
+// Underway: Mather Point has started, Phantom Ranch is still to come.
+const underway = () => itinerary({ id: 'trip', at: '2026-10-31T09:00:00Z', originalText: 'Mather Point, then Phantom Ranch', stops: [
+  { place: 'Mather Point', start: '2026-01-01T14:00:00.000Z', end: '2099-01-01T15:00:00.000Z' },
+  { place: 'Phantom Ranch', start: '2099-11-01T14:00:00.000Z', end: '2099-11-01T18:00:00.000Z' },
+] })
+const startCorrecting = () => {
+  data.itineraries = [underway()]
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
+}
+
+test('Correct loads the Itinerary into the form with started stops locked, and discarding it records nothing', () => {
+  startCorrecting()
+  expect(screen.getByText(/Correcting your Itinerary from/)).toBeTruthy()
+  expect((screen.getByLabelText('Paste your plans') as HTMLTextAreaElement).value).toBe('Mather Point, then Phantom Ranch')
+  const [started, toCome] = screen.getAllByRole('group', { name: /^Stop/ })
+  expect((started as HTMLFieldSetElement).disabled).toBe(true)
+  expect((within(started).getByLabelText('Place') as HTMLSelectElement).value).toBe('Mather Point')
+  expect((toCome as HTMLFieldSetElement).disabled).toBe(false)
+  expect((within(toCome).getByLabelText('Arrival') as HTMLInputElement).value).toBe('2099-11-01T07:00')
+  fireEvent.click(screen.getByRole('button', { name: 'Discard correction' }))
+  expect(screen.queryByText(/Correcting your Itinerary/)).toBeNull()
+  expect(screen.queryAllByRole('group', { name: /^Stop/ })).toHaveLength(0)
+  expect(confirmItinerary).not.toHaveBeenCalled()
+})
+
+test('confirming a Correction supersedes the old Itinerary and carries its started stops over', async () => {
+  startCorrecting()
+  const toCome = screen.getAllByRole('group', { name: /^Stop/ })[1]
+  fireEvent.change(within(toCome).getByLabelText('Place'), { target: { value: 'Yavapai Point' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
+  expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ supersedes: 'trip', stops: [
+    underway().stops[0], { ...underway().stops[1], place: 'Yavapai Point' },
+  ] }))
+  expect(screen.queryByText(/Correcting your Itinerary/)).toBeNull()
+})
+
+test('a superseded Itinerary leaves the list and its Correction shows', () => {
+  data.itineraries = [underway(), itinerary({ id: 'fix', at: '2026-10-31T10:00:00Z', supersedes: 'trip' })]
+  render(<Traveler />)
+  const entries = within(screen.getByRole('list', { name: 'Your confirmed Itineraries' })).getAllByRole('listitem', { name: /Itinerary confirmed/ })
+  expect(entries.map(e => e.getAttribute('aria-label'))).toEqual(['Itinerary confirmed 2026-10-31T10:00:00Z'])
+})
+
+test('a second Correction of the same Itinerary is refused, keeping the draft and showing the current Itinerary', async () => {
+  confirmItinerary.mockRejectedValueOnce(new AlreadyCorrectedError())
+  startCorrecting()
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  expect(await screen.findByText('This Itinerary was already corrected.')).toBeTruthy()
+  expect(reloadItineraries).toHaveBeenCalled()
+  expect(screen.getAllByRole('group', { name: /^Stop/ })).toHaveLength(2)
+})
+
+test('Withdraw asks for confirmation, and declining records nothing', () => {
+  const ask = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  data.itineraries = [underway()]
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+  expect(ask).toHaveBeenCalled()
+  expect(confirmItinerary).not.toHaveBeenCalled()
+  ask.mockRestore()
+})
+
+test('withdrawing records a Correction that keeps only the started stops', async () => {
+  const ask = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  data.itineraries = [underway()]
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+  await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
+  expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ supersedes: 'trip', stops: [underway().stops[0]] }))
+  ask.mockRestore()
+})
+
+test('a withdrawn Itinerary leaves the list, though its started stop carries over', () => {
+  data.itineraries = [underway(), { ...underway(), id: 'withdrawn', at: '2026-10-31T10:00:00Z', supersedes: 'trip', stops: [underway().stops[0]] }]
+  render(<Traveler />)
+  expect(screen.getByText(/No confirmed Itineraries/)).toBeTruthy()
+})
+
+test('withdrawing an already-corrected Itinerary is refused like Correct', async () => {
+  const ask = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  confirmItinerary.mockRejectedValueOnce(new AlreadyCorrectedError())
+  data.itineraries = [underway()]
+  const { rerender } = render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+  await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
+  // The reload shows the Correction in force instead, so the withdrawn entry leaves the list.
+  data.itineraries = [underway(), itinerary({ id: 'fix', at: '2026-10-31T10:00:00Z', supersedes: 'trip' })]
+  rerender(<Traveler />)
+  expect(await screen.findByText('This Itinerary was already corrected.')).toBeTruthy()
+  ask.mockRestore()
 })
 
 test('the queue lists Cases with status badges in the order Case rules return', () => {
@@ -127,6 +280,36 @@ function openMayaCase() {
   fireEvent.click(screen.getByRole('button', { name: 'Maya Chen' }))
   return within(screen.getByRole('region', { name: 'Case: Maya Chen' }))
 }
+
+test('a Case whose opening Itinerary was corrected shows the old and new stops; status and claim are unchanged', () => {
+  data.queue = [{ ...mayaCase, owner: 'Dana Ortiz', correction: {
+    withdrawn: false,
+    old: [{ place: 'Phantom Ranch', start: '2099-11-02T14:00:00Z', end: '2099-11-02T18:00:00Z' }],
+    new: [{ place: 'Mather Point', start: '2099-11-02T17:30:00Z', end: '2099-11-02T19:00:00Z' }],
+  } }]
+  data.history = []
+  const detail = openMayaCase()
+  const correction = within(detail.getByRole('region', { name: 'Itinerary corrected' }))
+  // Times are Grand Canyon local (UTC-7).
+  expect(within(correction.getByRole('list', { name: 'Stops the Case was opened on' })).getByText('Phantom Ranch').closest('li')?.textContent).toMatch(/7:00.*11:00/)
+  expect(within(correction.getByRole('list', { name: 'Stops now' })).getByText('Mather Point').closest('li')?.textContent).toMatch(/10:30.*12:00/)
+  expect(detail.getByText('Needs assistance')).toBeTruthy()
+  expect(detail.getByText('Claimed by Dana Ortiz')).toBeTruthy()
+})
+
+test('a Case whose opening Itinerary was withdrawn says so', () => {
+  data.queue = [{ ...mayaCase, correction: { withdrawn: true, old: [{ place: 'Phantom Ranch', start: '2099-11-02T14:00:00Z', end: '2099-11-02T18:00:00Z' }], new: [] } }]
+  data.history = []
+  const correction = within(openMayaCase().getByRole('region', { name: 'Itinerary withdrawn' }))
+  expect(correction.getByText('Phantom Ranch')).toBeTruthy()
+  expect(correction.getByText('No stops.')).toBeTruthy()
+})
+
+test('a Case whose Itinerary was not corrected shows no Correction', () => {
+  data.queue = [mayaCase]
+  data.history = []
+  expect(openMayaCase().queryByRole('region', { name: /Itinerary (corrected|withdrawn)/ })).toBeNull()
+})
 
 test('a claimed Case shows its owner in the queue', () => {
   data.queue = [{ ...mayaCase, owner: 'Dana Ortiz' }]
