@@ -14,13 +14,9 @@ export type CheckInRequest = { caseId: string; incident: string; reports: CheckI
 // `withdrawn`: the latest Correction had no stops still to come.
 // For Needs assistance: `urgency` (Case rules), `urgencyQuote` the AI's quote behind its proposal, `urgencyChanged` a Coordinator set it.
 export type QueueCase = {
-<<<<<<< Updated upstream
-  caseId: string; traveler: string; incident: string; explanation?: string; itineraryText?: string; at: string; owner: string | null; ownedByMe: boolean
+  caseId: string; incidentId?: string; incidentResolvedAt?: string | null; traveler: string; incident: string; explanation?: string; itineraryText?: string; at: string; owner: string | null; ownedByMe: boolean
   correction?: { withdrawn: boolean; old: Stop[]; new: Stop[] }
   urgency?: Urgency | 'untriaged'; urgencyQuote?: string | null; urgencyChanged?: boolean
-=======
-  caseId: string; incidentId?: string; incidentResolvedAt?: string | null; traveler: string; incident: string; explanation?: string; itineraryText?: string; at: string; owner: string | null; ownedByMe: boolean
->>>>>>> Stashed changes
 } & CaseStatus
 export type IndividualUpdate = {
   caseId: string
@@ -163,20 +159,13 @@ type QueueRow = {
   incident_id: string
   created_at: string
   persons: { name: string }
-<<<<<<< Updated upstream
-  incidents: { name: string }
+  incidents: { name: string; resolved_at?: string | null }
   reports: { id: string; kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
   opening?: { note: string | null; reports: { id: string; original_text: string | null; body: { stops: Stop[] } } | null }[]
   case_events: {
     action: 'claimed' | 'released' | 'resolved' | UrgencyEntry['action']; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome']
     urgency: Urgency | null; note: string | null; source_report_id: string | null
   }[]
-=======
-  incidents: { name: string; resolved_at?: string | null }
-  reports: { kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
-  opening?: { note: string | null; reports: { original_text: string | null } | null }[]
-  case_events: { action: 'claimed' | 'released' | 'resolved'; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
->>>>>>> Stashed changes
 }
 
 // Looks up a Coordinator's name by Account id; one without a name, or no longer listed, is just "Coordinator".
@@ -186,7 +175,6 @@ async function coordinatorNames() {
   return (accountId: string | null) => accountId ? names.get(accountId)?.trim() || `Coordinator #${accountId.slice(0, 8)}` : 'Coordinator'
 }
 
-<<<<<<< Updated upstream
 type CorrectionRow = { id: string; supersedes: string; created_at: string; body: { stops: Stop[] } }
 // The Itinerary now in force for each superseded opening Itinerary, following chains of Corrections.
 // ponytail: one `in` list per chain step; batch the ids if the open-Case count outgrows a URL.
@@ -207,21 +195,13 @@ async function latestCorrections(openingIds: string[]) {
   return latest
 }
 
-async function queue(): Promise<QueueCase[]> {
-  const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
-  if (!coordinator) throw new Error('A Coordinator account is required.')
-  const rows = await readPages((from, to) => supabase.from('cases').select(
-    'id, created_at, persons!inner(name), incidents!inner(name), reports(id, kind, body, created_at), case_events(action, actor, created_at, outcome, urgency, note, source_report_id), opening:case_events(note, reports(id, original_text, body))',
-  ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'released', 'resolved', 'urgency_proposed', 'urgency_changed']).eq('opening.action', 'opened')
-=======
 async function queue(includeResolvedIncidents = false): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
   const rows = await readPages((from, to) => {
     let query = supabase.from('cases').select(
-    'id, incident_id, created_at, persons!inner(name), incidents!inner(name,resolved_at), reports(kind, body, created_at), case_events(action, actor, created_at, outcome), opening:case_events(note, reports(original_text))',
-  ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'released', 'resolved']).eq('opening.action', 'opened')
->>>>>>> Stashed changes
+    'id, incident_id, created_at, persons!inner(name), incidents!inner(name,resolved_at), reports(id, kind, body, created_at), case_events(action, actor, created_at, outcome, urgency, note, source_report_id), opening:case_events(note, reports(id, original_text, body))',
+  ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'released', 'resolved', 'urgency_proposed', 'urgency_changed']).eq('opening.action', 'opened')
     .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
     .order('created_at', { referencedTable: 'case_events', ascending: false })
     .order('id', { referencedTable: 'case_events', ascending: false })
@@ -256,17 +236,12 @@ async function queue(includeResolvedIncidents = false): Promise<QueueCase[]> {
       e.action === 'urgency_proposed' || e.action === 'urgency_changed'
         ? [{ action: e.action, at: e.created_at, urgency: e.urgency, note: e.note, fromReport: e.source_report_id }] : []))
     return {
-<<<<<<< Updated upstream
-      caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
+      caseId: row.id, incidentId: row.incident_id, incidentResolvedAt: row.incidents.resolved_at, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
       itineraryText: opening?.original_text ?? undefined,
       correction: inForce ? {
         old: opening.body.stops, new: inForce.body.stops,
         withdrawn: withdraws(inForce.body.stops, Date.parse(inForce.created_at)),
       } : undefined,
-=======
-      caseId: row.id, incidentId: row.incident_id, incidentResolvedAt: row.incidents.resolved_at, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
-      itineraryText: row.opening?.[0]?.reports?.original_text ?? undefined,
->>>>>>> Stashed changes
       at: at ?? row.created_at, owner, ownedByMe, ...status,
       ...(triage && { urgency: triage.urgency, urgencyQuote: triage.quote, urgencyChanged: triage.changed }),
     }
