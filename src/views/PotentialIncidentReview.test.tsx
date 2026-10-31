@@ -11,8 +11,8 @@ afterEach(cleanup)
 test('a rejected verification shows sign-in recovery and retains the edited time window', async () => {
   verify.mockRejectedValue(new VerificationSessionError())
   const readings = floodReadings()
-  render(<PotentialIncidentReview onVerify={() => {}} draft={{
-    id: 'pending', name: 'Creek flood', starts_at: '2026-10-31T08:00:00Z', fallback: false,
+  render(<PotentialIncidentReview onDecided={() => {}} draft={{
+    id: 'pending', name: 'Creek flood', starts_at: '2026-10-31T08:00:00Z', fallback: false, corroborated: true, earlier: null,
     summary: 'Water rising', area: readings.warning.area,
     sources: [readings.gauge, readings.warning, readings.news].map(source => ({ ...source, quote: source.text })),
   }} />)

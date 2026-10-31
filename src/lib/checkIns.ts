@@ -296,19 +296,32 @@ export async function recordCaseEvent(caseId: string, event: CoordinatorAction) 
 }
 export function useIndividualUpdates() { return usePoll(individualUpdates) }
 
+export type Dismissal = { dismissed_at: string; dismissal_reason: string; dismisser: { name: string | null } | null }
+const dismissal = 'dismissed_at,dismissal_reason,dismisser:dismissed_by(name)'
+
 export type PotentialIncident = {
-  id: string; name: string; summary: string; starts_at: string; fallback: boolean
-  sources: { name: string; text: string; quote: string }[]
+  id: string; name: string; summary: string; starts_at: string; fallback: boolean; corroborated: boolean
+  sources: { name: string; text: string; quote: string; at: string }[]
   area: { type: 'Polygon'; coordinates: number[][][] }
+  earlier: Dismissal | null
 }
 
 async function pendingIncidents() {
   return readPages((from, to) => supabase.from('potential_incidents')
-    .select('id,name,summary,starts_at,fallback,sources,area').is('incident_id', null)
+    .select(`id,name,summary,starts_at,fallback,corroborated,sources,area,earlier:earlier_dismissal_id(${dismissal})`)
+    .is('incident_id', null).is('dismissed_at', null)
     .order('starts_at').order('id').range(from, to).returns<PotentialIncident[]>().throwOnError())
 }
 export function usePendingIncidents() { return usePoll(pendingIncidents) }
 export { verifyIncident } from './incidentVerification'
+async function dismissedIncidents() {
+  return readPages((from, to) => supabase.from('potential_incidents').select(`id,name,${dismissal}`).not('dismissed_at', 'is', null)
+    .order('dismissed_at', { ascending: false }).order('id').range(from, to).returns<({ id: string; name: string } & Dismissal)[]>().throwOnError())
+}
+export function useDismissedIncidents() { return usePoll(dismissedIncidents) }
+export async function dismissPotentialIncident(id: string, reason: string) {
+  await supabase.rpc('dismiss_potential_incident', { p_id: id, p_reason: reason }).throwOnError()
+}
 
 export type PublicIncident = {
   id: string; name: string; created_at: string; starts_at: string; ends_at: string | null
