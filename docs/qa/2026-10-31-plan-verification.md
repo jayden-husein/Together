@@ -11,7 +11,7 @@
 ## Evidence
 
 - `npm run build`: PASS.
-- `npm test`: PASS, 183 tests across the 14 test files in this checkout. Test discovery excludes unrelated worktrees; earlier larger counts included copies from another worktree.
+- `npm test`: PASS, 184 tests across the 14 test files in this checkout. Test discovery excludes unrelated worktrees; earlier larger counts included copies from another worktree.
 - Staging access and negative permission scripts: PASS for Maya, Sam, and Coordinator. Every tested forbidden coordinator RPC returns SQLSTATE 42501; AI and itinerary Edge Function role checks return HTTP 403.
 - Staging scenario: PASS for Safe → confirmed contact report → conflict banner → coordinator contact attempt → contact update without the private note → preview/post → delivery to Maya and Sam without reloads.
 - Staging update operations: PASS for post, edit, retract, and a genuine AI draft below 280 characters.
@@ -60,4 +60,8 @@ The reproducible checks live in `scripts/qa/`. They read demo credentials from e
 
 ## Production
 
-PR, merge, deployment and fresh production verification are recorded after deployment below.
+[PR #51](https://github.com/jayden-husein/Together/pull/51) merged into main and deployed to [Together](https://together-fdys.vercel.app/). All twelve migrations applied through the Supabase integration; the three updated Edge Functions were explicitly deployed.
+
+Fresh production browser contexts passed all 16 role/route combinations and all 112 viewport checks, with zero horizontal overflow and zero serious axe findings. The production workflow then exposed a stale local report control when an older open report was superseded by a Safe check-in. The follow-up regression test failed before the synchronization fix and passes afterward; the full staging browser scenario also passes with an open report preloaded. Final production scenario and QA retraction results are recorded on the follow-up PR.
+
+The production MCP security advisor flags intentionally exposed, authorization-checked SECURITY DEFINER RPCs and the existing disabled leaked-password-protection setting. These are distinct from the staging CLI advisor's no-warning result; do not read the staging result as a clean production Auth configuration audit.

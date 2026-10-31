@@ -76,6 +76,8 @@ export default function EmergencyContact() {
 function CaseRow({ c, onFiled, recent, muted, onMute }: { c: ContactCase; onFiled: () => void; recent?:IndividualUpdate[]; muted:boolean; onMute:()=>void }) {
   const [confirming, setConfirming] = useState(false)
   const [report, setReport] = useState<{id:string; at:number} | undefined>(() => c.openReport ? {id:c.openReport.id,at:Date.parse(c.openReport.at)} : undefined)
+  // Reconcile local cancellation controls when a newer check-in closes the report.
+  useEffect(() => { setReport(c.openReport ? {id:c.openReport.id,at:Date.parse(c.openReport.at)} : undefined) }, [c.openReport?.id,c.openReport?.at])
   const [now, setNow] = useState(Date.now())
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
   const [sending, setSending] = useState(false)
