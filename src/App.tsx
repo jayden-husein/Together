@@ -1,5 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { AccountProvider, SignInForm, SignedIn, useAccount } from './SignIn'
+import { Toasts } from './components'
 import { homeRoute, mayOpen } from './lib/access'
 import { SimulationLabel } from './ui'
 import Coordinator from './views/Coordinator'
@@ -61,6 +62,7 @@ function AppShell() {
       <main id="main-content" ref={main} tabIndex={-1}>
         {hash === '#/signin' ? <SignInForm /> : route.signIn ? <SignedIn>{account.capabilities && !mayOpen(route.hash, account.capabilities) ? <AccessWarning /> : <route.View />}</SignedIn> : <route.View />}
       </main>
+      <Toasts />
     </div>
   )
 }

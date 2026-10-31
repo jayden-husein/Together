@@ -100,7 +100,7 @@ function GeneralUpdates({ incidentId }: { incidentId: string }) {
     {error && <p role="alert">Could not load General Updates. Try refreshing the page.</p>}
     {!data ? !error && <p className="empty">Loading…</p> : data.length === 0 ? <p className="empty">No General Updates yet.</p> : (
       <ul className="rows" aria-label="General Updates">
-        {data.map(u => <li className="row" key={u.id}><p>{u.body}</p><SourceLine source="Posted by a Coordinator" at={u.created_at} /></li>)}
+        {data.map(u => <li className="row" key={u.id}><p>{u.retracted_at ? 'Retracted by a Coordinator' : u.body}</p><SourceLine source="Posted by a Coordinator" at={u.created_at} /></li>)}
       </ul>
     )}
   </section>

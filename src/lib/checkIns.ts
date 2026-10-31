@@ -76,7 +76,7 @@ async function myCheckIns(): Promise<CheckInRequest[]> {
   return ids.flatMap(id => cases.get(id) ?? [])
 }
 
-function usePoll<T>(load: () => Promise<T[]>): Poll<T> {
+export function usePoll<T>(load: () => Promise<T[]>): Poll<T> {
   const [result, setResult] = useState<PollResult<T>>({ data: undefined, error: null })
   const reload = useRef(() => {})
   useEffect(() => {
@@ -92,10 +92,10 @@ function usePoll<T>(load: () => Promise<T[]>): Poll<T> {
       again = false
       const version = generation
       try {
-        const data = await load()
+        const data = await Promise.race([load(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))])
         if (version === generation) setResult({ data, error: null })
       } catch (error) {
-        if (version === generation) setResult({ data: undefined, error: error instanceof Error ? error.message : 'Could not load updates.' })
+        if (version === generation) setResult({ data: undefined, error: 'Could not load updates. Please retry.' })
       } finally {
         if (version === generation) {
           pending = false
@@ -115,6 +115,7 @@ function usePoll<T>(load: () => Promise<T[]>): Poll<T> {
       setResult({ data: undefined, error: null })
       queueMicrotask(poll)
     })
+    window.addEventListener('together:data', poll)
     const timer = window.setInterval(poll, 3000)
     return () => {
       generation++
@@ -122,6 +123,7 @@ function usePoll<T>(load: () => Promise<T[]>): Poll<T> {
       reload.current = () => {}
       data.subscription.unsubscribe()
       window.clearInterval(timer)
+      window.removeEventListener('together:data', poll)
     }
   }, [load])
   return { ...result, reload: useCallback(() => reload.current(), []) }
@@ -157,6 +159,7 @@ export async function submitCheckIn(caseId: string, status: CheckInStatus, descr
   await supabase.rpc('submit_check_in', {
     p_case_id: caseId, p_status: status, p_description: description ?? null,
   }).throwOnError()
+  window.dispatchEvent(new Event('together:data'))
   // The Check-in is saved either way; until the AI proposes an Urgency, or if it can't, the Case is Untriaged.
   if (status === 'needs_assistance') void supabase.functions.invoke('triage-check-in', { body: { caseId } })
 }
@@ -306,6 +309,7 @@ export function useContactCases() { return usePoll(contactCases) }
 // Refused by the database unless the signed-in Account is an Emergency Contact of the Case's traveler.
 export async function fileCantReach(caseId: string) {
   const { data } = await supabase.rpc('file_cant_reach', { p_case_id: caseId, p_confirmed: true }).throwOnError()
+  window.dispatchEvent(new Event('together:data'))
   return data as string
 }
 
