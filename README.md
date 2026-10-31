@@ -43,6 +43,7 @@ Matching stops to an Incident, deciding who can see what, and choosing who gets 
 - **A fixed place list, not geocoding.** Itinerary stops must be one of a short list of known Grand Canyon places.
 - **Made-up sources, not live feeds.** The gauge readings and weather warning are fixed demo data.
 - **Pre-linked Emergency Contacts, not invites.** The demo seed links Maya to her Emergency Contact. There is no flow for inviting a contact or for the contact to accept.
+- **Demo Accounts only, no self sign-up.** The demo uses only the demo Accounts that `npm run reset-demo` creates.
 - **In-app Notifications only.** There is no SMS, email or push delivery. Someone sees a Notification only when they open the app.
 - **Consent-only records.** In this build a Person comes only from sign-up or the demo seed. Venue records shared with consent are the only other way in, and they're planned ([ADR-0002](docs/adr/0002-no-third-party-missing-person-reports.md)). Family members can't report someone who isn't already in Together; they're directed to law enforcement.
 - **Planned location is not presence.** A confirmed stop that overlaps an Incident opens a Case saying the person's whereabouts are unconfirmed. It doesn't claim they were there.
