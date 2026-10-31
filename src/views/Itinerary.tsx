@@ -23,9 +23,8 @@ export default function Itinerary() {
   const [saving, setSaving] = useState(false)
   const [tilesFailed, setTilesFailed] = useState(false)
   const [message, setMessage] = useState('')
+  // The traveler's pasted plans, kept with the confirmed Itinerary whether or not the AI read them.
   const [text, setText] = useState('')
-  // The pasted text the current stops were read from, kept with the confirmed Itinerary.
-  const [pasted, setPasted] = useState<string | null>(null)
   const [reading, setReading] = useState(false)
   const [readFailed, setReadFailed] = useState(false)
   function edit(next: Draft[]) {
@@ -40,7 +39,6 @@ export default function Itinerary() {
       const { data, error } = await supabase.functions.invoke<{ stops: ProposedStop[] }>('extract-itinerary', { body: { text } })
       if (error || !data) throw error
       edit(data.stops.map(p => ({ key: crypto.randomUUID(), quote: p.quote, needs: p.needs, place: p.place ?? '', start: p.start ?? '', end: p.end ?? '' })))
-      setPasted(text)
       if (!data.stops.length) setMessage('No stops found in your plans. Add them below.')
     } catch { setReadFailed(true) }
     finally { setReading(false) }
@@ -51,11 +49,10 @@ export default function Itinerary() {
     try {
       // Arizona stays on Mountain Standard Time year-round at these places.
       const payload = confirmedStops(stops.map(s => ({ ...s, start: s.start + '-07:00', end: s.end + '-07:00' })))
-      const { error } = await supabase.functions.invoke('confirm-itinerary', { body: { id, stops: payload, originalText: pasted } })
+      const { error } = await supabase.functions.invoke('confirm-itinerary', { body: { id, stops: payload, originalText: text.trim() || null } })
       if (error) throw new Error('Could not confirm your Itinerary. Your stops are here to try again.')
       edit([])
       setText('')
-      setPasted(null)
       setMessage('Itinerary confirmed.')
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not confirm your Itinerary.') }
     finally { setSaving(false) }
