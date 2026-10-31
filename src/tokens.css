@@ -2,6 +2,7 @@
   Together design tokens. Every color, type size, space and radius in the app comes from here.
 
   - Components use these custom properties only: never a hex, px or rem literal in a component rule.
+    The one exception is @container/@media breakpoints, which can't read custom properties.
     Missing a role? Add a token here (in both the light and dark blocks for colors), not a one-off value.
   - Colors are named by role, not hue. Status and Urgency use the same five roles:
       neutral  Unconfirmed, Can wait, Untriaged
@@ -54,7 +55,6 @@
   --text-xl: 1.625rem;   /* page headings */
   --leading-tight: 1.2;
   --leading-body: 1.5;
-  --weight-regular: 400;
   --weight-bold: 700;
   --tracking-heading: -0.01em;
 
@@ -64,7 +64,6 @@
   --space-3: 0.75rem;
   --space-4: 1rem;
   --space-6: 1.5rem;
-  --space-8: 2rem;
 
   --radius-sm: 0.25rem;  /* Urgency tags, Simulation label */
   --radius-md: 0.5rem;   /* buttons, cards */
@@ -76,6 +75,7 @@
   --tap-min: 3.5rem;     /* Check-in buttons: 56px, above the 48px floor */
   --measure: 36rem;      /* max width of a single reading column */
   --map-min-height: 18rem;
+  --header-height: 3.5rem; /* the sticky app header's height */
 }
 
 @media (prefers-color-scheme: dark) {

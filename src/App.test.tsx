@@ -9,7 +9,7 @@ afterEach(() => {
 
 test.each([
   ['#/traveler', 'Your Check-in'],
-  ['#/contact', 'People you follow'],
+  ['#/contact', 'Travelers who named you'],
   ['#/coordinator', 'Cases'],
   ['', 'Grand Canyon incident'],
 ])('route %s shows its view with the Simulation label', (hash, heading) => {

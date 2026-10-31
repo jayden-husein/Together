@@ -50,3 +50,8 @@ test('source line names the source and a machine-readable time', () => {
   expect(screen.getByText(/Park ranger station/)).toBeTruthy()
   expect(document.querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:05:00Z')
 })
+
+test('source line shows a malformed time as written instead of crashing the view', () => {
+  render(<SourceLine source="Venue record" at="not a time" />)
+  expect(screen.getByText('not a time')).toBeTruthy()
+})

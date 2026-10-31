@@ -6,8 +6,9 @@ import css from './tokens.css?raw'
 function tokens(block: string) {
   return Object.fromEntries([...block.matchAll(/--color-([\w-]+):\s*(#[0-9a-f]{6})/gi)].map(m => [m[1], m[2]]))
 }
-const light = tokens(css.split('@media (prefers-color-scheme: dark)')[0])
-const dark = { ...light, ...tokens(css.split('@media (prefers-color-scheme: dark)')[1]) }
+const [lightBlock, darkBlock] = css.split('@media (prefers-color-scheme: dark)')
+const light = tokens(lightBlock)
+const dark = { ...light, ...tokens(darkBlock) }
 
 function luminance(hex: string) {
   const [r, g, b] = [1, 3, 5].map(i => {

@@ -72,7 +72,7 @@
 }
 .check-in-button:not(:disabled):active { scale: 0.96; }
 .check-in-safe { background: var(--color-success-solid); }
-.check-in-needs { background: var(--color-danger-solid); }
+.check-in-needs-assistance { background: var(--color-danger-solid); }
 @media (prefers-reduced-motion: reduce) {
   .check-in-button { transition: none; }
   .check-in-button:not(:disabled):active { scale: none; }
