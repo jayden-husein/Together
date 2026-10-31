@@ -1,4 +1,4 @@
-import { SourceLine, StatusBadge } from '../ui'
+import { SourceLine, StatusBadge, statusClass } from '../ui'
 
 export default function EmergencyContact() {
   return (
@@ -8,7 +8,7 @@ export default function EmergencyContact() {
         <p className="lede">You get an Individual Update when their Case changes.</p>
       </header>
       <ul className="rows">
-        <li className="row">
+        <li className={`row ${statusClass('unconfirmed')}`}>
           <div className="row-main">
             <span className="row-name">Maya Chen</span>
             <StatusBadge status="unconfirmed" />

@@ -35,14 +35,15 @@
   white-space: nowrap;
   border: var(--border-width) solid currentColor;
 }
-.badge { border-radius: var(--radius-pill); }
 .tag { border-radius: var(--radius-sm); background: var(--color-surface); }
 
-.badge-unconfirmed { background: var(--color-neutral-bg); color: var(--color-neutral-fg); border-style: dashed; }
-.badge-cant_reach { background: var(--color-warning-bg); color: var(--color-warning-fg); }
-.badge-needs_assistance { background: var(--color-danger-bg); color: var(--color-danger-fg); }
-.badge-safe { background: var(--color-success-bg); color: var(--color-success-fg); }
-.badge-resolved { background: var(--color-info-bg); color: var(--color-info-fg); }
+/* One map from status to colors. Badges, rows and anything else tinted by a status read these three. */
+.status-unconfirmed { --status-bg: var(--color-neutral-bg); --status-fg: var(--color-neutral-fg); --status-border-style: dashed; }
+.status-cant_reach { --status-bg: var(--color-warning-bg); --status-fg: var(--color-warning-fg); }
+.status-needs_assistance { --status-bg: var(--color-danger-bg); --status-fg: var(--color-danger-fg); }
+.status-safe { --status-bg: var(--color-success-bg); --status-fg: var(--color-success-fg); }
+.status-resolved { --status-bg: var(--color-info-bg); --status-fg: var(--color-info-fg); }
+.badge { border-radius: var(--radius-pill); background: var(--status-bg); color: var(--status-fg); border-style: var(--status-border-style, solid); }
 
 .tag-immediate { background: var(--color-danger-bg); color: var(--color-danger-fg); }
 .tag-urgent { color: var(--color-warning-fg); }
@@ -58,6 +59,10 @@
   .check-in { grid-template-columns: 1fr 1fr; }
 }
 .check-in-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   min-block-size: var(--tap-min);
   padding: var(--space-3) var(--space-4);
   border: var(--border-width) solid transparent;
@@ -68,6 +73,7 @@
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   cursor: pointer;
+  box-shadow: var(--shadow-card);
   transition: scale 150ms ease-out;
 }
 .check-in-button:not(:disabled):active { scale: 0.96; }
@@ -76,6 +82,18 @@
 @media (prefers-reduced-motion: reduce) {
   .check-in-button { transition: none; }
   .check-in-button:not(:disabled):active { scale: none; }
+}
+
+/* Inline icons: drawn with currentColor so they take the text color of whatever holds them. */
+.icon {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .source-line {

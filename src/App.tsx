@@ -27,6 +27,8 @@ export default function App() {
   // A hash change resets nothing for assistive tech: retitle the page and move focus to the new view.
   useEffect(() => {
     document.title = `${route.label} – Together`
+    // On a phone the nav scrolls sideways; keep the current view's link in sight.
+    document.querySelector('nav [aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
     if (firstRender.current) firstRender.current = false
     else main.current?.focus()
   }, [route])
@@ -34,7 +36,13 @@ export default function App() {
   return (
     <div className="shell">
       <header className="app-header">
-        <a className="wordmark" href="#/">Together</a>
+        <a className="wordmark" href="#/">
+          <svg className="mark" viewBox="0 0 28 28" aria-hidden="true">
+            <circle cx="10.5" cy="14" r="7.5" />
+            <circle cx="17.5" cy="14" r="7.5" />
+          </svg>
+          Together
+        </a>
         <SimulationLabel />
         <nav aria-label="Views">
           {ROUTES.map(r => (

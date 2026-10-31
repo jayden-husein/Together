@@ -30,8 +30,11 @@ export function SimulationLabel() {
   )
 }
 
+/** `status-<status>` sets that status's colors (ui.css). Put it on anything tinted by a status, such as a Case row. */
+export const statusClass = (status: CaseStatus) => `status-${status}`
+
 export function StatusBadge({ status }: { status: CaseStatus }) {
-  return <span className={`badge badge-${status}`}>{STATUS_LABEL[status]}</span>
+  return <span className={`badge ${statusClass(status)}`}>{STATUS_LABEL[status]}</span>
 }
 
 export function UrgencyTag({ urgency }: { urgency: Urgency }) {
@@ -42,9 +45,16 @@ export function CheckInButtons({ onCheckIn }: { onCheckIn: (status: CheckInStatu
   return (
     <div className="check-in" role="group" aria-label="Check in">
       <button type="button" className="check-in-button check-in-safe" onClick={() => onCheckIn('safe')}>
+        <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </svg>
         Safe
       </button>
       <button type="button" className="check-in-button check-in-needs-assistance" onClick={() => onCheckIn('needs_assistance')}>
+        <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7.5v5.5M12 16.5v.01" />
+        </svg>
         Needs assistance
       </button>
     </div>
