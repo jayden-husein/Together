@@ -57,8 +57,8 @@ Vercel deploys only the app, not the database. A PR that adds a migration must p
 
 ## Split for two people
 
-- **Person A (critical path):** #6, #7, #10, #12, #13. Hand the UI side of #7 to Person B once #17 lands.
-- **Person B (everything else):** #16 and #17 first, then the UI side of #7. After #7, in this order: #8, #11 (once #10 closes), #9, then #14 and #15 only if time allows; the cut times below still apply.
+- **Person A (critical path):** #6, the data and Case rules half of #7, then #10, #12, #13.
+- **Person B (everything else):** #16 and #17 first, then the screens half of #7 ([split](https://github.com/jayden-husein/Together/issues/7#issuecomment-6539474566)). After #7, in this order: #8, #11 (once #10 closes), #9, then #14 and #15 only if time allows; the cut times below still apply.
 
 Whoever is free first takes the other's next unblocked ticket. Nothing should wait on the critical path.
 
