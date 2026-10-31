@@ -1,6 +1,6 @@
 // Deletes and reloads only the demo data: the rows flagged `demo` and the demo Accounts.
 // Usage: npm run reset-demo -- staging|production
-import { accounts, serverClient, password } from './demo.ts'
+import { accounts, serverClient, password, signIn } from './demo.ts'
 
 const db = serverClient()
 const check = <T>({ data, error }: { data: T; error: unknown }) => {
@@ -10,7 +10,10 @@ const check = <T>({ data, error }: { data: T; error: unknown }) => {
 
 check(await db.rpc('delete_demo_data'))
 
-const demoEmails = new Set(Object.values(accounts))
+const names = ['Maya', 'Alex', 'Jordan', 'Quinn', 'Avery', 'Riley', 'Sam', 'Taylor', 'Morgan', 'Sage',
+  'Reese', 'Blair', 'Jules', 'River', 'Noor', 'Ellis', 'Indy', 'Ari', 'Remy', 'Casey']
+const travelers = names.map((name, i) => ({ name, email: `traveler-${i + 1}@demo.together.example.com` }))
+const demoEmails = new Set([...Object.values(accounts), ...travelers.map(t => t.email)])
 // ponytail: one page of 1000 users; paginate if the project ever has more real Accounts.
 const { users } = check(await db.auth.admin.listUsers({ perPage: 1000 }))
 for (const user of users.filter((u) => demoEmails.has(u.email!))) check(await db.auth.admin.deleteUser(user.id))
@@ -41,7 +44,19 @@ const [incident] = check(
     })
     .select(),
 )
-const [mayaCase] = check(await db.from('cases').insert({ incident_id: incident.id, person_id: maya.id, demo }).select())
-check(await db.from('case_events').insert({ case_id: mayaCase.id, action: 'opened', actor: null, demo }))
-
-console.log(`Demo data reset: Maya's Case ${mayaCase.id} in Incident ${incident.id} is Unconfirmed.`)
+// Use the same authenticated confirmation as manual entry so the seed exercises Match.
+const hour = 60 * 60_000
+const now = Date.now()
+async function confirm(email: string, place: string, start: number) {
+  const client = await signIn(email)
+  const stops = [{ place, start: new Date(start).toISOString(), end: new Date(start + hour).toISOString() }]
+  check(await client.functions.invoke('confirm-itinerary', { body: { id: crypto.randomUUID(), stops } }))
+}
+await confirm(accounts.maya, 'Phantom Ranch', now)
+for (const [i, { name, email }] of travelers.entries()) {
+  const { user } = check(await db.auth.admin.createUser({ email, password, email_confirm: true }))
+  check(await db.from('persons').insert({ account_id: user!.id, name, demo }))
+  // One group overlaps, one stays on the rim, one visited before the flood.
+  await confirm(email, i % 3 === 1 ? 'Mather Point' : 'Phantom Ranch', i % 3 === 2 ? now - 24 * hour : now)
+}
+console.log(`Reset 21 traveler Itineraries for Incident ${incident.id}.`)

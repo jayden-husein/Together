@@ -7,7 +7,7 @@ export type CheckInStatus = 'safe' | 'needs_assistance'
 export type CheckInReport = { id: string; status: CheckInStatus; description: string | null; at: string }
 export type CheckInRequest = { caseId: string; incident: string; reports: CheckInReport[] }
 // `at`: when the status was set (the latest Report or resolution), else when the Case opened.
-export type QueueCase = { caseId: string; traveler: string; incident: string; at: string } & CaseStatus
+export type QueueCase = { caseId: string; traveler: string; incident: string; explanation?: string; at: string } & CaseStatus
 export type IndividualUpdate = {
   caseId: string
   traveler: string
@@ -108,6 +108,7 @@ type QueueRow = {
   persons: { name: string }
   incidents: { name: string }
   reports: { kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
+  opening?: { note: string | null }[]
   case_events: { created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
 }
 
@@ -115,8 +116,8 @@ async function queue(): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
   const rows = await readPages((from, to) => supabase.from('cases').select(
-    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome)',
-  ).in('reports.kind', ['check_in', 'cant_reach']).eq('case_events.action', 'resolved')
+    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome), opening:case_events(note)',
+  ).in('reports.kind', ['check_in', 'cant_reach']).eq('case_events.action', 'resolved').eq('opening.action', 'opened')
     .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
     .order('created_at').order('id').range(from, to).returns<QueueRow[]>().throwOnError())
   return orderQueue(rows.map(row => {
@@ -127,7 +128,7 @@ async function queue(): Promise<QueueCase[]> {
     for (const event of row.case_events) history.push({ at: event.created_at, outcome: event.outcome, status: 'resolved' })
     const status = caseStatus(history)
     const at = status.status === 'resolved' ? row.case_events.find(e => e.outcome)?.created_at : row.reports[0]?.created_at
-    return { caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, at: at ?? row.created_at, ...status }
+    return { caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined, at: at ?? row.created_at, ...status }
   }))
 }
 

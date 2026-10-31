@@ -140,3 +140,9 @@
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
 }
+
+.itinerary, .itinerary fieldset, .itinerary label { display: grid; gap: .5rem; }
+.itinerary fieldset { min-width: 0; }
+.itinerary input, .itinerary select { font: inherit; width: 100%; min-width: 0; }
+.itinerary-map { height: 16rem; }
+.itinerary > div:last-child { display: flex; flex-wrap: wrap; gap: .5rem; }
