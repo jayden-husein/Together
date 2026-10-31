@@ -14,7 +14,7 @@ test.each([
   async () => ({ summary: 'Flood', quotes: [...quotes].reverse() }),
   async () => ({ summary: 'Flood', quotes: ['', ...quotes.slice(1)] }),
   async () => ({ summary: 'Flood', quotes: quotes.slice(1) }),
-  async () => { throw new Error('Claude unavailable') },
+  async () => { throw new Error('AI unavailable') },
 ])('unusable AI evidence produces a labeled pre-written draft', async summarize => {
   const draft = await draftFlood(readings, summarize)
   expect(draft.fallback).toBe(true)
