@@ -1,7 +1,8 @@
 import PotentialIncidentReview, { DismissalLine } from './PotentialIncidentReview'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import type { Urgency } from '../lib/caseRules'
 import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, useDismissedIncidents, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
-import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, Stops, UrgencyTag, formatTime, statusClass } from '../ui'
+import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, Stops, URGENCY_LABEL, UrgencyTag, formatTime, statusClass } from '../ui'
 
 // Queue order, so the summary reads the same way as the list below it.
 const STATUSES: CaseStatus[] = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved']
@@ -53,8 +54,10 @@ export default function Coordinator() {
                 <button type="button" className="link-button row-name" aria-pressed={c.caseId === selected}
                   onClick={() => setSelected(c.caseId === selected ? undefined : c.caseId)}>{c.traveler}</button>
                 <StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} />
+                {c.urgency && <UrgencyTag urgency={c.urgency} />}
               </div>
               <p className="lede">{c.incident}</p>
+              <Triage c={c} />
               {c.explanation && <p>Matched stop: {c.explanation}</p>}
               <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
               <SourceLine source={SOURCE[c.status]} at={c.at} />
@@ -82,6 +85,21 @@ const ENTRY: Record<CaseHistoryItem['entry'], string> = {
 }
 
 const OUTCOMES = Object.entries(OUTCOME_LABEL) as [Outcome, string][]
+const URGENCIES = (['immediate', 'urgent', 'can_wait'] as const).map(u => [u, URGENCY_LABEL[u]] as [Urgency, string])
+
+// Where a Needs assistance Case's Urgency came from: the AI's quote from the traveler, and whether a Coordinator changed it.
+function Triage({ c }: { c: QueueCase }) {
+  if (!c.urgency) return null
+  return (
+    <>
+      {c.urgencyChanged ? <p>Urgency set by a Coordinator.</p> : c.urgency === 'untriaged' ? <p>Untriaged: no Urgency from the AI. Set one.</p> : <p>Urgency proposed by the AI.</p>}
+      {c.urgencyQuote && <>
+        <p>{c.urgencyChanged ? "The AI's own proposal quoted:" : 'From the traveler\'s words:'}</p>
+        <blockquote aria-label="The traveler's words behind the AI's proposed Urgency">{c.urgencyQuote}</blockquote>
+      </>}
+    </>
+  )
+}
 
 function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null)
@@ -100,6 +118,7 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
         <p>{c.incident}</p><div><StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} /></div>
       </header>
       <p className="lede">Notes stay with Coordinators. Emergency Contacts see only the outcome.</p>
+      <Triage c={c} />
       {c.explanation && <p>Matched stop: {c.explanation}</p>}
       {c.itineraryText && <blockquote aria-label="What the traveler pasted for their Itinerary">{c.itineraryText}</blockquote>}
       {/* The Case stays open: the Coordinator decides whether the traveler is still at risk. */}
@@ -112,6 +131,12 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       <EventForm legend="Owner" submitLabel={c.ownedByMe ? 'Unclaim' : c.owner ? 'Take over case' : 'Claim'} note="none" onSubmit={() => record({ action: c.ownedByMe ? 'released' : 'claimed' })}>
         <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
       </EventForm>
+      {c.status === 'needs_assistance' && (
+        <details className="case-tools"><summary>Change Urgency</summary>
+        <EventForm legend="Urgency" submitLabel="Change Urgency" note="optional" choices={URGENCIES}
+          onSubmit={(urgency, { note }) => record({ action: 'urgency_changed', urgency: urgency as Urgency, note })} />
+        </details>
+      )}
       <details className="case-tools"><summary>Record a contact attempt</summary>
       <EventForm legend="Contact Attempt" submitLabel="Record" note="required" reports={reports}
         choices={[['reached', 'Reached'], ['not_reached', 'Not reached']]}
@@ -148,7 +173,7 @@ function HistoryEntry({ item, from }: { item: CaseHistoryItem; from?: CaseHistor
       <div className="row-main">
         <span className="row-name">
           {item.entry === 'contact_attempt' ? `Contact Attempt: ${item.reached ? 'Reached' : 'Not reached'}` : ENTRY[item.entry]}
-          {item.urgency && <>: <UrgencyTag urgency={item.urgency} /></>}
+          {(item.urgency || item.entry === 'urgency_proposed') && <>: <UrgencyTag urgency={item.urgency ?? 'untriaged'} /></>}
         </span>
         {badge && <StatusBadge status={badge} outcome={item.outcome ?? undefined} />}
       </div>

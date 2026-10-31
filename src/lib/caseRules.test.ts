@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { caseStatus, individualUpdateView, orderQueue } from './caseRules'
+import { caseStatus, caseUrgency, individualUpdateView, orderQueue } from './caseRules'
 
 test('a Case with no reply stays Unconfirmed', () => {
   expect(caseStatus([{ at: '2026-11-01T13:00:00Z', status: null, outcome: null }])).toEqual({ status: 'unconfirmed' })
@@ -47,6 +47,47 @@ test('a later resolution corrects an earlier one', () => {
 test('a resolved Individual Update carries its outcome', () => {
   expect(individualUpdateView({ status: 'resolved', at: '2026-11-01T14:00:00Z', outcome: 'assistance_provided' }))
     .toEqual({ status: 'resolved', at: '2026-11-01T14:00:00Z', outcome: 'assistance_provided' })
+})
+
+const latestCheckIn = { id: 'r2', at: '2026-11-01T14:00:00Z' }
+const proposal = { action: 'urgency_proposed', at: '2026-11-01T14:00:02Z', urgency: 'can_wait', note: 'we have water', fromReport: 'r2' } as const
+
+test('the AI\'s proposal for the latest Check-in sets the Urgency, with its quote', () => {
+  expect(caseUrgency(latestCheckIn, [proposal])).toEqual({ urgency: 'can_wait', quote: 'we have water', changed: false })
+})
+
+test('a Coordinator override wins over the AI\'s proposal, even a later one', () => {
+  const change = { action: 'urgency_changed', at: '2026-11-01T14:00:01Z', urgency: 'immediate', note: null, fromReport: null } as const
+  expect(caseUrgency(latestCheckIn, [change, proposal])).toEqual({ urgency: 'immediate', quote: 'we have water', changed: true })
+})
+
+test('without a valid proposal for the latest Check-in the Case is Untriaged', () => {
+  expect(caseUrgency(latestCheckIn, [])).toEqual({ urgency: 'untriaged', quote: null, changed: false })
+  // The AI couldn't assess it.
+  expect(caseUrgency(latestCheckIn, [{ ...proposal, urgency: null, note: null }]).urgency).toBe('untriaged')
+  // A proposal or a change about an earlier Check-in says nothing about the new one.
+  const earlier = [
+    { ...proposal, fromReport: 'r1', at: '2026-11-01T14:00:05Z' },
+    { action: 'urgency_changed', at: '2026-11-01T13:00:00Z', urgency: 'can_wait', note: null, fromReport: null },
+  ] as const
+  expect(caseUrgency(latestCheckIn, earlier)).toEqual({ urgency: 'untriaged', quote: null, changed: false })
+})
+
+test('Needs assistance Cases sort Untriaged first, then Immediate, Urgent and Can wait', () => {
+  const cases = [
+    { status: 'needs_assistance', urgency: 'can_wait' },
+    { status: 'cant_reach' },
+    { status: 'needs_assistance', urgency: 'urgent' },
+    { status: 'needs_assistance', urgency: 'untriaged' },
+    { status: 'needs_assistance', urgency: 'immediate' },
+  ] as const
+  expect(orderQueue([...cases]).map(c => 'urgency' in c ? c.urgency : c.status))
+    .toEqual(['untriaged', 'immediate', 'urgent', 'can_wait', 'cant_reach'])
+})
+
+test('an Urgency Individual Update carries the level and time, never the AI\'s quote', () => {
+  const entry = { status: null, urgency: 'immediate', at: '2026-11-01T14:00:02Z', note: 'my son cut his leg badly' } as const
+  expect(individualUpdateView(entry)).toEqual({ urgency: 'immediate', at: entry.at })
 })
 
 test("a Check-in after a Can't-reach report replaces Can't reach", () => {

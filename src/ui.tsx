@@ -23,7 +23,7 @@ export const OUTCOME_LABEL: Record<Outcome, string> = {
   not_in_area: 'Not in area',
 }
 
-const URGENCY_LABEL: Record<Urgency, string> = {
+export const URGENCY_LABEL: Record<Urgency, string> = {
   immediate: 'Immediate',
   urgent: 'Urgent',
   can_wait: 'Can wait',

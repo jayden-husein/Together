@@ -22,8 +22,18 @@ export function proposedStops(text: string, reply: unknown): ProposedStop[] {
   })
 }
 
+export const urgencies = ['immediate', 'urgent', 'can_wait'] as const
+export type Urgency = typeof urgencies[number]
+
+// A proposed Urgency for a Needs assistance Check-in, or null (Untriaged) unless the level is
+// valid and the quote is really in the traveler's words.
+export function proposedUrgency(text: string, reply: unknown): { urgency: Urgency; quote: string } | null {
+  const { urgency, quote } = (reply ?? {}) as { urgency?: unknown; quote?: unknown }
+  return urgencies.includes(urgency as Urgency) && quoted(text, quote) ? { urgency: urgency as Urgency, quote } : null
+}
+
 // A quote must be whole words of the pasted text, ignoring case and runs of whitespace,
-// with at least three letters or digits so it shows where the stop came from.
+// with at least three letters or digits so it shows where the stop or Urgency came from.
 function quoted(text: string, quote: unknown): quote is string {
   if (typeof quote !== 'string' || (quote.match(/[\p{L}\p{N}]/gu)?.length ?? 0) < 3) return false
   const normalize = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()

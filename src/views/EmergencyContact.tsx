@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { type ContactCase, fileCantReach, type IndividualUpdate, markIndividualUpdatesRead, useContactCases, useIndividualUpdates } from '../lib/checkIns'
-import { SourceLine, StatusBadge, statusClass } from '../ui'
+import { SourceLine, StatusBadge, UrgencyTag, statusClass } from '../ui'
 
-const key = ({ caseId, update }: IndividualUpdate) => `${caseId} ${update.at} ${update.status}`
+const key = ({ caseId, update }: IndividualUpdate) => `${caseId} ${update.at} ${'status' in update ? update.status : update.urgency}`
 
 export default function EmergencyContact() {
   const { data, error } = useIndividualUpdates()
@@ -43,14 +43,16 @@ export default function EmergencyContact() {
       ) : data.length === 0 ? (
         <p className="empty">No Individual Updates yet.</p>
       ) : (
-        // Status and time only (Case rules: Individual Update view), newest first.
+        // Status or Urgency, and time only (Case rules: Individual Update view), newest first.
         <ul className="rows" aria-label="Individual Updates">
           {data.map(entry => (
-            <li className={`row ${statusClass(entry.update.status)}`} key={key(entry)}>
+            <li className={'status' in entry.update ? `row ${statusClass(entry.update.status)}` : 'row'} key={key(entry)}>
               <div className="row-main">
                 <span className="row-name">{entry.traveler}</span>
                 {(entry.unreadNotificationId || fresh.has(key(entry))) && <span className="new">New</span>}
-                <StatusBadge status={entry.update.status} outcome={entry.update.outcome} />
+                {'status' in entry.update
+                  ? <StatusBadge status={entry.update.status} outcome={entry.update.outcome} />
+                  : <span>Urgency: <UrgencyTag urgency={entry.update.urgency} /></span>}
               </div>
               <SourceLine source="Individual Update" at={entry.update.at} />
             </li>
