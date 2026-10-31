@@ -24,7 +24,8 @@ For each stop give:
 - place: the listed place they mean, or null if none clearly matches.
 - date: the day as YYYY-MM-DD, or null if the plans don't say which day. Resolve "today" or "tomorrow" from today's date; never guess a day the plans don't give.
 - start and end: 24-hour local times as HH:MM, or null if the plans don't say. "1 to 4" after a morning stop means 13:00 to 16:00.
-Listed places: ${Object.keys(places).join('; ')}.`
+Listed places: ${Object.keys(places).join('; ')}.
+Reply with only the JSON object.`
 
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response(null, { headers })
@@ -37,18 +38,21 @@ Deno.serve(async request => {
     const text = typeof body?.text === 'string' ? body.text.trim() : ''
     if (!text || text.length > maxTextLength) return reply(400, { message: `Paste 1 to ${maxTextLength} characters.` })
     const today = localDateTime(Date.now()).slice(0, 10)
-    const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY'), timeout: 20_000, maxRetries: 0 })
-    const response = await openai.responses.create({
-      model: 'gpt-6-luna',
-      max_output_tokens: 4000,
-      reasoning: { effort: 'low' },
-      text: { format: { type: 'json_schema', name: 'itinerary', schema, strict: true } },
-      instructions: system,
-      input: `Today is ${today}.\n<plans>\n${text.replace(/<\s*\/?\s*plans\b[^>]*>/gi, '')}\n</plans>`,
+    // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API.
+    const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 20_000, maxRetries: 0 })
+    const completion = await dartmouth.chat.completions.create({
+      model: 'openai.gpt-6-luna',
+      max_completion_tokens: 4000,
+      response_format: { type: 'json_schema', json_schema: { name: 'itinerary', schema, strict: true } },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: `Today is ${today}.\n<plans>\n${text.replace(/<\s*\/?\s*plans\b[^>]*>/gi, '')}\n</plans>` },
+      ],
     })
-    // An incomplete reply or a refusal has no usable JSON.
-    if (response.status !== 'completed' || !response.output_text) throw new Error(`status ${response.status}`)
-    return reply(200, { stops: proposedStops(text, JSON.parse(response.output_text)) })
+    // A cut-off reply or a refusal has no usable JSON.
+    const choice = completion.choices[0]
+    if (choice?.finish_reason !== 'stop' || !choice.message.content) throw new Error(`finish reason ${choice?.finish_reason}`)
+    return reply(200, { stops: proposedStops(text, JSON.parse(choice.message.content)) })
   } catch (error) {
     console.error('Extract itinerary failed', error instanceof Error ? error.message : 'unknown error')
     return reply(502, { message: 'Could not read your plans.' })

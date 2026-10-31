@@ -29,7 +29,7 @@ The demo seed ([#6](https://github.com/jayden-husein/Together/issues/6)) marks a
 
 ## How the AI is used
 
-OpenAI's GPT-6 Luna has three jobs ([ADR-0003](docs/adr/0003-openai-gpt-6-luna.md)). It never makes the final decision in any of them. It is called only from Supabase Edge Functions, so the API key never reaches the browser. Its replies are structured, and plain code checks every reply before it is used: each quote must appear in the input, places must come from the fixed list, and any coordinates the model supplies are ignored. If the AI fails or times out, you can still do the job by hand. Together shows no percentages or confidence scores.
+OpenAI's GPT-6 Luna, reached through the Dartmouth Chat API, has three jobs ([ADR-0003](docs/adr/0003-gpt-6-luna-via-dartmouth-chat.md)). It never makes the final decision in any of them. It is called only from Supabase Edge Functions, so the API key never reaches the browser. Its replies are structured, and plain code checks every reply before it is used: each quote must appear in the input, places must come from the fixed list, and any coordinates the model supplies are ignored. If the AI fails or times out, you can still do the job by hand. Together shows no percentages or confidence scores.
 
 | Job | What the AI does | Human checkpoint |
 | --- | --- | --- |
@@ -115,7 +115,7 @@ You need git and Node.js 22.22+ or 24.15+ (the test runner needs these versions)
 
 Other commands: `npm test` runs the tests, `npm run typecheck` runs the type checker, and `npm run build` makes a production build.
 
-`.env` holds secrets and is ignored by git. Never put the Supabase secret key or the OpenAI API key in a `VITE_` variable, because Vite copies those into the browser bundle.
+`.env` holds secrets and is ignored by git. Never put the Supabase secret key or the Dartmouth Chat API key in a `VITE_` variable, because Vite copies those into the browser bundle.
 
 ## Staging workflow
 
