@@ -9,6 +9,7 @@ for(const role of ['maya','sam','coordinator']){
  const context=await browser.newContext({viewport:{width:1440,height:1000},colorScheme:'dark'})
  const page=await context.newPage();page.on('dialog',d=>d.accept());pages[role]=page
  await page.goto(base+'#/signin');await page.getByLabel('Email',{exact:true}).fill(`${role}@demo.together.example.com`);await page.getByLabel('Password',{exact:true}).fill(process.env.DEMO_PASSWORD);await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL(role==='sam'?'**/#/contact':role==='maya'?'**/#/traveler':'**/#/coordinator',{timeout:20000})
+ if(role==='sam'){await page.waitForTimeout(2000);const previous=page.getByRole('button',{name:/I can't reach Maya/});if(await previous.count()){await previous.click();await page.getByRole('button',{name:'Yes, report it'}).click();await page.getByRole('button',{name:'Cancel report'}).waitFor()}}
 }
 const {maya,sam,coordinator}=pages
 const change=maya.getByRole('button',{name:'Change answer',exact:true})

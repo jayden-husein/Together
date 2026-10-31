@@ -501,3 +501,12 @@ test.each([['traveler', Traveler], ['Emergency Contact', EmergencyContact]])('a 
   fireEvent.click(item)
   await waitFor(() => expect(markRead).toHaveBeenCalledWith(['n-7']))
 })
+
+test('a newer traveler check-in releases the contact report action without reloading', () => {
+ data.contactCases=[{caseId:'c1',traveler:'Maya',incident:'Flood',status:'cant_reach',openReport:{id:'old-report',at:'2026-10-31T12:00:00Z'}}]
+ const view=render(<EmergencyContact />)
+ expect(screen.queryByRole('button',{name:"I can't reach Maya"})).toBeNull()
+ data.contactCases=[{caseId:'c1',traveler:'Maya',incident:'Flood',status:'safe',safeAt:'2026-10-31T13:00:00Z'}]
+ view.rerender(<EmergencyContact />)
+ expect(screen.getByRole('button',{name:"I can't reach Maya"})).toBeTruthy()
+})
