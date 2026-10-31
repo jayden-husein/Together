@@ -58,12 +58,8 @@ export default function Coordinator() {
                 <StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} />
                 {c.urgency && <UrgencyTag urgency={c.urgency} />}
               </div>
-<<<<<<< Updated upstream
-              <p className="lede">{c.incident}</p>
-              <Triage c={c} />
-=======
               <p className="lede">{c.incident}{c.incidentResolvedAt && <> — Incident resolved {formatTime(c.incidentResolvedAt)}</>}</p>
->>>>>>> Stashed changes
+              <Triage c={c} />
               {c.explanation && <p>Matched stop: {c.explanation}</p>}
               <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
               <SourceLine source={SOURCE[c.status]} at={c.at} />
