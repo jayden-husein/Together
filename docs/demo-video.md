@@ -8,7 +8,7 @@ Only show what passed in the run-through ([run-through.md](run-through.md)). If 
 
 | Time | Scene | Window on screen | Point it makes |
 | --- | --- | --- | --- |
-| 0:00–0:15 | 1. The problem | Public page (`#/`) with the map | Nobody has one shared picture of who might be caught in a flood |
+| 0:00–0:25 | 1. The problem | Public page (`#/`) with the map | A human always makes the final decision; nobody has one shared picture of who might be caught in a flood |
 | 0:15–0:40 | 2. Maya's plans | Traveler (Maya) | The AI reads plain text; Maya confirms |
 | 0:40–1:10 | 3. The flood | Coordinator | The AI drafts an incident, but a person verifies it |
 | 1:10–1:20 | 4. Who might be there | Coordinator queue | Plain code opens Cases, and says why |
@@ -21,11 +21,13 @@ Only show what passed in the run-through ([run-through.md](run-through.md)). If 
 
 Lines in quotes are the voice-over. Each scene's word count fits its slot at a calm pace (about 150 words a minute).
 
-### 1. The problem (0:00–0:15)
+### 1. The problem (0:00–0:25)
 
 **Show:** the public page, with the Simulation label and the flood area on the map.
 
-> "After a flash flood in a place like the Grand Canyon, a family knows where someone planned to go, and coordinators have scattered reports. Nobody has one picture of who might be caught in it. Together builds that picture. Everything you'll see is simulated."
+> "In our project, a human always makes the final decision. The AI only drafts; Maya confirms her own plans, and a Coordinator verifies every incident and sets every Urgency.
+>
+> After a flash flood in a place like the Grand Canyon, a family knows where someone planned to go, and coordinators have scattered reports. Nobody has one picture of who might be caught in it. Together builds that picture. Everything you'll see is simulated."
 
 ### 2. Maya's plans (0:15–0:40)
 
