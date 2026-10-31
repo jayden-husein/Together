@@ -1,8 +1,13 @@
 import { useQueue } from '../lib/checkIns'
-import { type CaseStatus, StatusBadge, statusClass } from '../ui'
+import { type CaseStatus, SourceLine, StatusBadge, statusClass } from '../ui'
 
 // Queue order, so the summary reads the same way as the list below it.
 const STATUSES: CaseStatus[] = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved']
+
+// What set each status, for the row's source line.
+const SOURCE: Record<CaseStatus, string> = {
+  needs_assistance: 'Check-in', safe: 'Check-in', cant_reach: "Can't-reach report", unconfirmed: 'Case opened', resolved: 'Resolved',
+}
 
 export default function Coordinator() {
   const { data, error } = useQueue()
@@ -35,6 +40,7 @@ export default function Coordinator() {
                 <StatusBadge status={c.status} />
               </div>
               <p className="lede">{c.incident}</p>
+              <SourceLine source={SOURCE[c.status]} at={c.at} />
             </li>
           ))}
         </ul>

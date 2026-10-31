@@ -7,8 +7,10 @@ import Traveler from './Traveler'
 
 const data = vi.hoisted(() => ({ myCheckIns: [] as CheckInRequest[], queue: [] as QueueCase[], updates: [] as IndividualUpdate[] }))
 const submitCheckIn = vi.hoisted(() => vi.fn(async () => {}))
+const markRead = vi.hoisted(() => vi.fn(async () => {}))
 vi.mock('../lib/checkIns', () => ({
   submitCheckIn,
+  markIndividualUpdatesRead: markRead,
   useMyCheckIns: () => ({ data: data.myCheckIns, error: null }),
   useQueue: () => ({ data: data.queue, error: null }),
   useIndividualUpdates: () => ({ data: data.updates, error: null }),
@@ -17,6 +19,7 @@ vi.mock('../lib/checkIns', () => ({
 afterEach(() => {
   cleanup()
   submitCheckIn.mockClear()
+  markRead.mockClear()
 })
 
 const request = (reports: CheckInRequest['reports'] = []): CheckInRequest => ({ caseId: 'case-1', incident: 'Flash flood at Phantom Ranch', reports })
@@ -58,9 +61,9 @@ test('the traveler sees what they sent and when, newest first', () => {
 
 test('the queue lists Cases with status badges in the order Case rules return', () => {
   data.queue = [
-    { caseId: 'c1', traveler: 'Maya Chen', incident: 'Flash flood at Phantom Ranch', status: 'needs_assistance' },
-    { caseId: 'c2', traveler: 'Priya Natarajan', incident: 'Flash flood at Phantom Ranch', status: 'unconfirmed' },
-    { caseId: 'c3', traveler: 'Tom Alvarez', incident: 'Flash flood at Phantom Ranch', status: 'safe' },
+    { caseId: 'c1', traveler: 'Maya Chen', incident: 'Flash flood at Phantom Ranch', status: 'needs_assistance', at: '2026-10-31T14:12:00Z' },
+    { caseId: 'c2', traveler: 'Priya Natarajan', incident: 'Flash flood at Phantom Ranch', status: 'unconfirmed', at: '2026-10-31T13:48:00Z' },
+    { caseId: 'c3', traveler: 'Tom Alvarez', incident: 'Flash flood at Phantom Ranch', status: 'safe', at: '2026-10-31T13:55:00Z' },
   ]
   render(<Coordinator />)
   const rows = within(screen.getByRole('list', { name: 'Case queue' })).getAllByRole('listitem')
@@ -69,12 +72,16 @@ test('the queue lists Cases with status badges in the order Case rules return', 
     expect.stringMatching(/Priya Natarajan.*Unconfirmed/),
     expect.stringMatching(/Tom Alvarez.*Safe/),
   ])
+  // Each row says what set its status and when.
+  expect(rows[0].textContent).toMatch(/Check-in,/)
+  expect(rows[0].querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:12:00Z')
+  expect(rows[1].textContent).toMatch(/Case opened,/)
 })
 
 test('the Emergency Contact sees each Individual Update as status and time, newest first', () => {
   data.updates = [
-    { caseId: 'c1', traveler: 'Maya Chen', update: { status: 'needs_assistance', at: '2026-10-31T14:12:00Z' } },
-    { caseId: 'c1', traveler: 'Maya Chen', update: { status: 'safe', at: '2026-10-31T13:55:00Z' } },
+    { caseId: 'c1', traveler: 'Maya Chen', update: { status: 'needs_assistance', at: '2026-10-31T14:12:00Z' }, unreadNotificationId: null },
+    { caseId: 'c1', traveler: 'Maya Chen', update: { status: 'safe', at: '2026-10-31T13:55:00Z' }, unreadNotificationId: null },
   ]
   render(<EmergencyContact />)
   const items = within(screen.getByRole('list', { name: 'Individual Updates' })).getAllByRole('listitem')
@@ -83,4 +90,20 @@ test('the Emergency Contact sees each Individual Update as status and time, newe
     expect.stringMatching(/Maya Chen.*Safe/),
   ])
   expect(items[0].querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:12:00Z')
+})
+
+test('unread Individual Updates are marked New, marked read, and stay New while the page is open', async () => {
+  const older = { caseId: 'c1', traveler: 'Maya Chen', update: { status: 'safe' as const, at: '2026-10-31T13:55:00Z' }, unreadNotificationId: null }
+  const latest = { caseId: 'c1', traveler: 'Maya Chen', update: { status: 'needs_assistance' as const, at: '2026-10-31T14:12:00Z' } }
+  data.updates = [{ ...latest, unreadNotificationId: 'n1' }, older]
+  const { rerender } = render(<EmergencyContact />)
+  const items = () => within(screen.getByRole('list', { name: 'Individual Updates' })).getAllByRole('listitem')
+  expect(within(items()[0]).getByText('New')).toBeTruthy()
+  expect(within(items()[1]).queryByText('New')).toBeNull()
+  await waitFor(() => expect(markRead).toHaveBeenCalledWith(['n1']))
+  // The next poll sees it read; the marker stays until the contact leaves the page.
+  data.updates = [{ ...latest, unreadNotificationId: null }, older]
+  rerender(<EmergencyContact />)
+  expect(within(items()[0]).getByText('New')).toBeTruthy()
+  expect(markRead).toHaveBeenCalledTimes(1)
 })

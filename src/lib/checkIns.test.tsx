@@ -15,7 +15,7 @@ vi.mock('./supabase', async () => {
       const offset = Number(url.searchParams.get('offset'))
       const size = Number(url.searchParams.get('limit') ?? 100)
       const rows = Array.from({ length: Math.min(size, 101 - offset) }, (_, i) => ({
-        id: String(offset + i), persons: { name: 'Traveler' }, incidents: { name: 'Flood' }, case_events: [],
+        id: String(offset + i), created_at: '2026-10-31T05:00:00Z', persons: { name: 'Traveler' }, incidents: { name: 'Flood' }, case_events: [],
         reports: offset + i === 100 ? [{ kind: 'check_in', body: { status: 'needs_assistance' }, created_at: '2026-10-31T06:00:00Z' }] : [],
       }))
       return Response.json(rows)
@@ -25,6 +25,9 @@ vi.mock('./supabase', async () => {
     const page = <T,>(rows: T[]) => Response.json(rows.slice(offset, offset + limit))
     const ids = Array.from({ length: 1001 }, (_, i) => 'case-' + i)
     const at = '2026-10-31T06:00:00Z'
+    if (path.endsWith('/notifications') && url.searchParams.get('kind') === 'eq.individual_update') {
+      return page([{ id: 'n-0', refers_to: 'case-0', created_at: at }])
+    }
     if (path.endsWith('/notifications')) return page(ids.map(refers_to => ({ refers_to })))
     if (path.endsWith('/rpc/contact_case_updates')) {
       return page(ids.map(case_id => ({ case_id, person_name: 'Maya', status: 'safe', at })))
@@ -61,6 +64,9 @@ test('a Needs assistance Case on the next page appears first in the queue', asyn
   try {
     await waitFor(() => expect(hook.result.current.data?.[0].caseId).toBe('100'))
     expect(hook.result.current.data).toHaveLength(101)
+    // Each Case's time is when its status was set: the latest Report, else when the Case opened.
+    expect(hook.result.current.data?.[0].at).toBe('2026-10-31T06:00:00Z')
+    expect(hook.result.current.data?.[1].at).toBe('2026-10-31T05:00:00Z')
   } finally {
     hook.unmount()
     queueFixture = false
@@ -82,5 +88,8 @@ test('contact receives the full update history through the original screen contr
   try {
     await waitFor(() => expect(hook.result.current.data).toHaveLength(1001))
     expect(hook.result.current.data?.some(entry => entry.caseId === 'case-1000')).toBe(true)
+    // The unread Individual Update Notification matches the update its Check-in delivered.
+    expect(hook.result.current.data?.find(entry => entry.caseId === 'case-0')?.unreadNotificationId).toBe('n-0')
+    expect(hook.result.current.data?.find(entry => entry.caseId === 'case-1')?.unreadNotificationId).toBeNull()
   } finally { hook.unmount() }
 })

@@ -6,11 +6,14 @@ import { supabase } from './supabase'
 export type CheckInStatus = 'safe' | 'needs_assistance'
 export type CheckInReport = { id: string; status: CheckInStatus; description: string | null; at: string }
 export type CheckInRequest = { caseId: string; incident: string; reports: CheckInReport[] }
-export type QueueCase = { caseId: string; traveler: string; incident: string } & CaseStatus
+// `at`: when the status was set (the latest Report or resolution), else when the Case opened.
+export type QueueCase = { caseId: string; traveler: string; incident: string; at: string } & CaseStatus
 export type IndividualUpdate = {
   caseId: string
   traveler: string
   update: ReturnType<typeof individualUpdateView>
+  // The Notification that delivered this update, while the contact hasn't seen it.
+  unreadNotificationId: string | null
 }
 
 export type ContactUpdate = IndividualUpdate
@@ -101,6 +104,7 @@ export async function submitCheckIn(caseId: string, status: CheckInStatus, descr
 
 type QueueRow = {
   id: string
+  created_at: string
   persons: { name: string }
   incidents: { name: string }
   reports: { kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
@@ -111,7 +115,7 @@ async function queue(): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
   const rows = await readPages((from, to) => supabase.from('cases').select(
-    'id, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome)',
+    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome)',
   ).in('reports.kind', ['check_in', 'cant_reach']).eq('case_events.action', 'resolved')
     .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
     .order('created_at').order('id').range(from, to).returns<QueueRow[]>().throwOnError())
@@ -121,7 +125,9 @@ async function queue(): Promise<QueueCase[]> {
       status: report.kind === 'cant_reach' ? 'cant_reach' : report.body.status ?? null,
     }))
     for (const event of row.case_events) history.push({ at: event.created_at, outcome: event.outcome, status: 'resolved' })
-    return { caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, ...caseStatus(history) }
+    const status = caseStatus(history)
+    const at = status.status === 'resolved' ? row.case_events.find(e => e.outcome)?.created_at : row.reports[0]?.created_at
+    return { caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, at: at ?? row.created_at, ...status }
   }))
 }
 
@@ -134,7 +140,18 @@ async function individualUpdates(): Promise<IndividualUpdate[]> {
     if (!Array.isArray(data)) throw new Error('Expected a list of Individual Updates.')
     return { data }
   })
-  return data.reverse().map(entry => ({ caseId: entry.case_id, traveler: entry.person_name, update: individualUpdateView(entry) }))
+  // submit_check_in writes the Report and its Notifications in one transaction, so they share a created_at.
+  const unread = await readPages((from, to) => supabase.from('notifications').select('id, refers_to, created_at')
+    .eq('kind', 'individual_update').is('read_at', null).order('created_at').order('id').range(from, to).throwOnError())
+  const unreadIds = new Map(unread.map(n => [`${n.refers_to} ${n.created_at}`, n.id]))
+  return data.reverse().map(entry => ({
+    caseId: entry.case_id, traveler: entry.person_name, update: individualUpdateView(entry),
+    unreadNotificationId: unreadIds.get(`${entry.case_id} ${entry.at}`) ?? null,
+  }))
+}
+
+export async function markIndividualUpdatesRead(notificationIds: string[]) {
+  await supabase.rpc('mark_notifications_read', { p_ids: notificationIds }).throwOnError()
 }
 
 export function useQueue() { return usePoll(queue) }
