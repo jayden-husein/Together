@@ -21,6 +21,9 @@ export type Place = keyof typeof places
 
 export type Stop = { place: Place; start: string; end: string }
 
+// An Itinerary is current while one of its stops has not yet ended.
+export const isCurrent = (stops: Stop[], now = Date.now()) => stops.some(s => Date.parse(s.end) > now)
+
 export function confirmedStops(input: unknown, now = Date.now()): Stop[] {
   if (!Array.isArray(input) || !input.length || input.length > maxStops) throw new Error(`Choose 1 to ${maxStops} stops.`)
   return input.map(row => {

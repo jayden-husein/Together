@@ -1,10 +1,12 @@
+import Itineraries from './Itineraries'
 import Itinerary from './Itinerary'
 import { useState } from 'react'
-import { type CheckInRequest, type CheckInStatus, submitCheckIn, useMyCheckIns } from '../lib/checkIns'
+import { type CheckInRequest, type CheckInStatus, submitCheckIn, useMyCheckIns, useMyItineraries } from '../lib/checkIns'
 import { CheckInButtons, SourceLine, StatusBadge, statusClass } from '../ui'
 
 export default function Traveler() {
   const { data, error } = useMyCheckIns()
+  const itineraries = useMyItineraries()
   return (
     <div className="column">
       <header className="view-header">
@@ -18,7 +20,8 @@ export default function Traveler() {
       ) : (
         data.map(request => <Request key={request.caseId} request={request} />)
       )}
-      <Itinerary />
+      <Itinerary onConfirmed={itineraries.reload} />
+      <Itineraries data={itineraries.data} error={itineraries.error} />
     </div>
   )
 }

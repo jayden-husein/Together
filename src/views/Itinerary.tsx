@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { CircleMarker, MapContainer, Tooltip } from 'react-leaflet'
 import type { ProposedStop } from '../../supabase/functions/_shared/aiOutputCheck'
 import { confirmedStops, localDateTime, maxStops, maxTextLength, mstOffset, places, type Stop } from '../../supabase/functions/_shared/itinerary'
-import MapTiles from '../MapTiles'
+import { confirmItinerary } from '../lib/checkIns'
 import { supabase } from '../lib/supabase'
+import StopsMap from './StopsMap'
 
 // From AI extraction: `quote`, the words the stop was read from; `needs`, what to fill in;
 // `times`, the HH:MM window read from plans that didn't say which day.
@@ -16,7 +16,8 @@ const proposed = (p: ProposedStop): Draft => ({
   times: !p.date && p.start && p.end ? { start: p.start, end: p.end } : undefined,
 })
 
-export default function Itinerary() {
+// `onConfirmed`: called once an Itinerary is stored, e.g. to show it in the list right away.
+export default function Itinerary({ onConfirmed }: { onConfirmed?: () => void }) {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
@@ -28,7 +29,6 @@ export default function Itinerary() {
   const [stops, setStops] = useState<Draft[]>([])
   const [id, setId] = useState(() => crypto.randomUUID())
   const [saving, setSaving] = useState(false)
-  const [tilesFailed, setTilesFailed] = useState(false)
   const [message, setMessage] = useState('')
   // The traveler's pasted plans, kept with the confirmed Itinerary whether or not the AI read them.
   const [text, setText] = useState('')
@@ -57,11 +57,12 @@ export default function Itinerary() {
     setMessage('')
     try {
       const payload = confirmedStops(stops.map(s => ({ ...s, start: s.start + mstOffset, end: s.end + mstOffset })))
-      const { error } = await supabase.functions.invoke('confirm-itinerary', { body: { id, stops: payload, originalText: text.trim() || null } })
-      if (error) throw new Error('Could not confirm your Itinerary. Your stops are here to try again.')
+      try { await confirmItinerary({ id, stops: payload, originalText: text.trim() || null }) }
+      catch { throw new Error('Could not confirm your Itinerary. Your stops are here to try again.') }
       edit([])
       setText('')
       setMessage('Itinerary confirmed.')
+      onConfirmed?.()
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not confirm your Itinerary.') }
     finally { setSaving(false) }
   }
@@ -94,14 +95,7 @@ export default function Itinerary() {
           <button className="button" type="button" onClick={() => edit(stops.filter(s => s.key !== stop.key))}>Remove stop</button>
         </fieldset>
       })}
-      {stops.some(s => s.place) && <MapContainer className="itinerary-map" center={[36.082, -112.115]} zoom={11}>
-        <MapTiles onError={() => setTilesFailed(true)} />
-        {stops.filter(s => s.place).map(s => {
-          const [lng, lat] = places[s.place as keyof typeof places]
-          return <CircleMarker key={s.key} center={[lat, lng]} radius={7}><Tooltip>{s.place}</Tooltip></CircleMarker>
-        })}
-      </MapContainer>}
-      {tilesFailed && <p role="status">Map tiles could not load. Review your places in the stop list above.</p>}
+      <StopsMap stops={stops} />
       <div><button className="button" type="button" disabled={saving || stops.length >= maxStops} onClick={() => edit([...stops, blank()])}>Add stop</button>
         {stops.length > 0 && <button className="button" disabled={saving} type="submit">Confirm Itinerary</button>}</div>
     </form>

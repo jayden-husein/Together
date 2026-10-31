@@ -1,11 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
-import type { CaseHistoryItem, CheckInRequest, ContactCase, IndividualUpdate, QueueCase } from '../lib/checkIns'
+import type { CaseHistoryItem, CheckInRequest, ConfirmedItinerary, ContactCase, IndividualUpdate, QueueCase } from '../lib/checkIns'
 import Coordinator from './Coordinator'
 import EmergencyContact from './EmergencyContact'
 import Traveler from './Traveler'
 
-const data = vi.hoisted(() => ({ myCheckIns: [] as CheckInRequest[], queue: [] as QueueCase[], updates: [] as IndividualUpdate[], contactCases: [] as ContactCase[], history: [] as CaseHistoryItem[] }))
+const data = vi.hoisted(() => ({ myCheckIns: [] as CheckInRequest[], queue: [] as QueueCase[], updates: [] as IndividualUpdate[], contactCases: [] as ContactCase[], history: [] as CaseHistoryItem[], itineraries: [] as ConfirmedItinerary[] | undefined, itinerariesError: null as string | null }))
+const reloadItineraries = vi.hoisted(() => vi.fn())
+const confirmItinerary = vi.hoisted(() => vi.fn(async () => {}))
 const recordCaseEvent = vi.hoisted(() => vi.fn(async () => {}))
 const submitCheckIn = vi.hoisted(() => vi.fn(async () => {}))
 const markRead = vi.hoisted(() => vi.fn(async () => {}))
@@ -21,6 +23,8 @@ vi.mock('../lib/checkIns', () => ({
   useIndividualUpdates: () => ({ data: data.updates, error: null }),
   useContactCases: () => ({ data: data.contactCases, error: null, reload: () => {} }),
   fileCantReach,
+  useMyItineraries: () => ({ data: data.itineraries, error: data.itinerariesError, reload: reloadItineraries }),
+  confirmItinerary,
 }))
 
 afterEach(() => {
@@ -29,6 +33,10 @@ afterEach(() => {
   markRead.mockClear()
   fileCantReach.mockClear()
   recordCaseEvent.mockClear()
+  reloadItineraries.mockClear()
+  confirmItinerary.mockClear()
+  data.itineraries = []
+  data.itinerariesError = null
 })
 
 const request = (reports: CheckInRequest['reports'] = []): CheckInRequest => ({ caseId: 'case-1', incident: 'Flash flood at Phantom Ranch', reports })
@@ -66,6 +74,55 @@ test('the traveler sees what they sent and when, newest first', () => {
   expect(within(items[0]).getByText('Water rising at camp')).toBeTruthy()
   expect(items[0].querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:12:00Z')
   expect(within(items[1]).getByText('Safe')).toBeTruthy()
+})
+
+const itinerary = (fields: Partial<ConfirmedItinerary> & Pick<ConfirmedItinerary, 'id' | 'at'>): ConfirmedItinerary =>
+  ({ stops: [{ place: 'Phantom Ranch', start: '2099-11-01T14:00:00Z', end: '2099-11-01T18:00:00Z' }], originalText: null, ...fields })
+
+test('the traveler sees their current Itineraries, newest first, each with its stops in Grand Canyon time', () => {
+  data.itineraries = [
+    itinerary({ id: 'older', at: '2026-10-30T09:00:00Z', originalText: 'Phantom Ranch 7 to 11' }),
+    itinerary({ id: 'past', at: '2026-10-31T09:00:00Z', stops: [{ place: 'Mather Point', start: '2026-01-01T14:00:00Z', end: '2026-01-01T15:00:00Z' }] }),
+    itinerary({ id: 'newer', at: '2026-10-31T10:00:00Z', stops: [
+      { place: 'Mather Point', start: '2026-01-01T14:00:00Z', end: '2026-01-01T15:00:00Z' },
+      { place: 'Yavapai Point', start: '2099-11-02T17:30:00Z', end: '2099-11-02T19:00:00Z' },
+    ] }),
+  ]
+  render(<Traveler />)
+  const entries = within(screen.getByRole('list', { name: 'Your confirmed Itineraries' })).getAllByRole('listitem', { name: /Itinerary confirmed/ })
+  expect(entries).toHaveLength(2)
+  expect(entries.map(e => e.querySelector('.source-line time')?.getAttribute('dateTime'))).toEqual(['2026-10-31T10:00:00Z', '2026-10-30T09:00:00Z'])
+  // A started stop of a current Itinerary still shows; times are Grand Canyon local (UTC-7).
+  expect(within(entries[0]).getByText('Mather Point')).toBeTruthy()
+  expect(within(entries[0]).getByText('Yavapai Point').closest('li')?.textContent).toMatch(/10:30.*12:00/)
+  expect(entries[0].querySelector('.itinerary-map')).toBeTruthy()
+  // Pasted plans are collapsed, and only shown when there were plans.
+  expect(entries[0].querySelector('details')).toBeNull()
+  const plans = entries[1].querySelector('details')!
+  expect(plans.open).toBe(false)
+  expect(within(plans).getByText('Phantom Ranch 7 to 11')).toBeTruthy()
+})
+
+test('the Itinerary list has an empty state and an error state', () => {
+  data.itineraries = []
+  render(<Traveler />)
+  expect(screen.getByText(/No confirmed Itineraries/)).toBeTruthy()
+  cleanup()
+  data.itineraries = undefined
+  data.itinerariesError = 'Network down'
+  render(<Traveler />)
+  expect(screen.getByRole('alert').textContent).toMatch(/Network down/)
+})
+
+test('confirming an Itinerary refreshes the list', async () => {
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Add stop' }))
+  fireEvent.change(screen.getByLabelText('Place'), { target: { value: 'Phantom Ranch' } })
+  fireEvent.change(screen.getByLabelText('Arrival'), { target: { value: '2099-11-01T07:00' } })
+  fireEvent.change(screen.getByLabelText('Departure'), { target: { value: '2099-11-01T11:00' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
+  expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ stops: [{ place: 'Phantom Ranch', start: '2099-11-01T14:00:00.000Z', end: '2099-11-01T18:00:00.000Z' }] }))
 })
 
 test('the queue lists Cases with status badges in the order Case rules return', () => {
