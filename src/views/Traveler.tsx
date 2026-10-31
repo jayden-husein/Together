@@ -26,7 +26,7 @@ export default function Traveler() {
       )}
       <Itinerary key={form} correcting={correcting} onCancel={() => restart(null)}
         onConfirmed={() => { setCorrecting(null); itineraries.reload() }} onAlreadyCorrected={itineraries.reload} />
-      <Itineraries data={itineraries.data} error={itineraries.error} onCorrect={restart} />
+      <Itineraries data={itineraries.data} error={itineraries.error} onCorrect={restart} onChange={itineraries.reload} />
     </div>
   )
 }

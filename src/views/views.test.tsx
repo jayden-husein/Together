@@ -181,6 +181,43 @@ test('a second Correction of the same Itinerary is refused, keeping the draft an
   expect(screen.getAllByRole('group', { name: /^Stop/ })).toHaveLength(2)
 })
 
+test('Withdraw asks for confirmation, and declining records nothing', () => {
+  const ask = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  data.itineraries = [underway()]
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+  expect(ask).toHaveBeenCalled()
+  expect(confirmItinerary).not.toHaveBeenCalled()
+  ask.mockRestore()
+})
+
+test('withdrawing records a Correction that keeps only the started stops', async () => {
+  const ask = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  data.itineraries = [underway()]
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+  await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
+  expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ supersedes: 'trip', stops: [underway().stops[0]] }))
+  ask.mockRestore()
+})
+
+test('a withdrawn Itinerary leaves the list, though its started stop carries over', () => {
+  data.itineraries = [underway(), { ...underway(), id: 'withdrawn', at: '2026-10-31T10:00:00Z', supersedes: 'trip', stops: [underway().stops[0]] }]
+  render(<Traveler />)
+  expect(screen.getByText(/No confirmed Itineraries/)).toBeTruthy()
+})
+
+test('withdrawing an already-corrected Itinerary is refused like Correct', async () => {
+  const ask = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  confirmItinerary.mockRejectedValueOnce(new AlreadyCorrectedError())
+  data.itineraries = [underway()]
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+  expect(await screen.findByText('This Itinerary was already corrected.')).toBeTruthy()
+  expect(reloadItineraries).toHaveBeenCalled()
+  ask.mockRestore()
+})
+
 test('the queue lists Cases with status badges in the order Case rules return', () => {
   data.queue = [
     { caseId: 'c1', traveler: 'Maya Chen', incident: 'Flash flood at Phantom Ranch', status: 'needs_assistance', at: '2026-10-31T14:12:00Z', owner: null, ownedByMe: false },

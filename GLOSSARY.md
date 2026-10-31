@@ -57,6 +57,10 @@ _Avoid_: Trip plan (in code), schedule
 A new Itinerary that **supersedes** an old one, carrying over unchanged the old stops that have started. The old Itinerary stays as history but no longer counts.
 _Avoid_: Edit, update (of an Itinerary)
 
+**Withdraw**:
+A **Correction** with no stops still to come, for an outing that is off: the started stops carry over and nothing else does. A withdrawn Itinerary leaves the traveler's list.
+_Avoid_: Cancel, delete (of an Itinerary)
+
 **In force**:
 Said of an Itinerary that no Correction supersedes. Only Itineraries in force are listed to the traveler and matched against Incidents.
 
