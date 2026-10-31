@@ -1,30 +1,23 @@
-import OpenAI from 'openai'
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0'
 import { draftFlood, fixturePacket, type Reading } from '../_shared/flood.ts'
 import { match } from '../_shared/match.ts'
 import { inForce } from '../_shared/itinerary.ts'
+import { askModel } from '../_shared/model.ts'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type' }
 const reply = (status: number, message: string) => Response.json({ message }, { headers, status })
 
 async function summarize(readings: Reading[]) {
-  // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API; draftFlood checks every quote it returns.
-  const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 15_000, maxRetries: 0 })
-  const completion = await dartmouth.chat.completions.create({
-    model: 'openai.gpt-6-luna',
-    max_completion_tokens: 600,
-    response_format: { type: 'json_schema', json_schema: { name: 'potential_incident', strict: true, schema: {
+  // draftFlood checks every quote the model returns.
+  return askModel({
+    name: 'potential_incident', maxTokens: 600,
+    schema: {
       type: 'object', additionalProperties: false, required: ['summary', 'quotes'],
       properties: { summary: { type: 'string' }, quotes: { type: 'array', items: { type: 'string' } } },
-    } } },
-    messages: [
-      { role: 'system', content: 'Summarize these synthetic flood readings for a Coordinator. Return only JSON with a short summary string and quotes, an array of one exact nonempty excerpt per reading in the supplied order.' },
-      { role: 'user', content: JSON.stringify(readings.map(({ name, text }) => ({ name, text }))) },
-    ],
+    },
+    system: 'Summarize these synthetic flood readings for a Coordinator. Return only JSON with a short summary string and quotes, an array of one exact nonempty excerpt per reading in the supplied order.',
+    user: JSON.stringify(readings.map(({ name, text }) => ({ name, text }))),
   })
-  const choice = completion.choices[0]
-  if (choice?.finish_reason !== 'stop' || !choice.message.content) throw new Error(`finish reason ${choice?.finish_reason}`)
-  return JSON.parse(choice.message.content)
 }
 
 async function verify(db: SupabaseClient, account: string, id: string, start: string, end: string | null) {

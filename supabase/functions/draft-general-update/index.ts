@@ -1,7 +1,7 @@
-import OpenAI from 'openai'
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0'
 import { draftedUpdate } from '../_shared/aiOutputCheck.ts'
 import { headers, reply, signedInUser } from '../_shared/http.ts'
+import { askModel } from '../_shared/model.ts'
 import { RESOURCE_KIND_LABEL, resources } from '../_shared/resources.ts'
 
 const schema = { type: 'object', additionalProperties: false, required: ['draft'], properties: { draft: { type: 'string' } } }
@@ -29,17 +29,7 @@ Deno.serve(async request => {
       incident: { name: incident.name, starts: incident.starts_at, ends: incident.ends_at ?? 'ongoing' },
       resources: resources.map(r => ({ name: r.name, kind: RESOURCE_KIND_LABEL[r.kind], availability: r.availability, updated: r.updatedAt })),
     }
-    // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API, as for triage.
-    const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 15_000, maxRetries: 0 })
-    const completion = await dartmouth.chat.completions.create({
-      model: 'openai.gpt-6-luna',
-      max_completion_tokens: 400,
-      response_format: { type: 'json_schema', json_schema: { name: 'general_update', schema, strict: true } },
-      messages: [{ role: 'system', content: system }, { role: 'user', content: JSON.stringify(facts) }],
-    })
-    const choice = completion.choices[0]
-    if (choice?.finish_reason !== 'stop' || !choice.message.content) throw new Error(`finish reason ${choice?.finish_reason}`)
-    const draft = draftedUpdate(JSON.parse(choice.message.content))
+    const draft = draftedUpdate(await askModel({ name: 'general_update', schema, system, maxTokens: 400, user: JSON.stringify(facts) }))
     if (!draft) throw new Error('the AI output check rejected the draft')
     return reply(200, { draft })
   } catch (error) {

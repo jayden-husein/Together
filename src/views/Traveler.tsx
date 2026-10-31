@@ -1,9 +1,10 @@
+import GeneralUpdateNotices from './GeneralUpdateNotices'
 import Itineraries from './Itineraries'
 import Itinerary from './Itinerary'
 import { useState } from 'react'
 import { type CheckInRequest, type ConfirmedItinerary, type CheckInStatus, submitCheckIn, useMyCheckIns, useMyItineraries } from '../lib/checkIns'
 import { RESOURCE_KIND_LABEL } from '../../supabase/functions/_shared/resources'
-import { CheckInButtons, SimulationLabel, SourceLine, StatusBadge, statusClass } from '../ui'
+import { CheckInButtons, ResourceSource, SimulationLabel, SourceLine, StatusBadge, statusClass } from '../ui'
 
 export default function Traveler() {
   const { data, error } = useMyCheckIns()
@@ -17,6 +18,7 @@ export default function Traveler() {
       <header className="view-header">
         <h1>Your Check-in</h1>
       </header>
+      <GeneralUpdateNotices />
       {error && <p role="alert">{error}</p>}
       {!data ? (
         !error && <p className="empty">Loading…</p>
@@ -64,7 +66,7 @@ function Request({ request }: { request: CheckInRequest }) {
         <h2>Check-in Request</h2>
         <p>{request.incident}: Coordinators are asking whether you're safe. Choose one.</p>
         <p>Nearest Resource: <strong>{request.nearestResource.name}</strong> ({RESOURCE_KIND_LABEL[request.nearestResource.kind]}) <SimulationLabel />. {request.nearestResource.availability}.</p>
-        <SourceLine source={`${request.nearestResource.source}, last updated`} at={request.nearestResource.updatedAt} />
+        <ResourceSource resource={request.nearestResource} />
         <CheckInButtons onCheckIn={status => (status === 'safe' ? send('safe') : setAsking(true))} />
         {asking && (
           <form className="describe" onSubmit={e => { e.preventDefault(); send('needs_assistance') }}>

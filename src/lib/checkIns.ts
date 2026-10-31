@@ -1,9 +1,8 @@
-// Public contract for the three signed-in screens: the Check-in loop (#7) and the Coordinator Case workflow (#8).
+// Public contract for the screens: the three signed-in ones (Check-in loop #7, Coordinator Case workflow #8) and the public incident page (#15).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { caseStatus, caseUrgency, compareTimes, individualUpdateView, orderQueue, type CaseHistoryEntry, type CaseStatus, type Outcome, type Urgency, type UrgencyEntry } from './caseRules'
-import { inForce, places, withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
-import { match } from '../../supabase/functions/_shared/match'
-import { nearestResource, type Resource } from '../../supabase/functions/_shared/resources'
+import { inForce, withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
+import { nearestResourceFor, type Resource } from '../../supabase/functions/_shared/resources'
 import { supabase } from './supabase'
 
 export type CheckInStatus = 'safe' | 'needs_assistance'
@@ -55,7 +54,7 @@ async function myCheckIns(): Promise<CheckInRequest[]> {
     .eq('kind', 'check_in_request').order('created_at').order('id').range(from, to).throwOnError())
   const ids = [...new Set(requests.map(request => request.refers_to))]
   const cases = new Map<string, CheckInRequest>()
-  // The same Match rule that opened the Case finds the stop: travelers can't read the Case event that names it.
+  // nearestResourceFor finds the stop by the same Match rule that opened the Case: travelers can't read the Case event that names it.
   const stops = ids.length ? inForce(await myItineraries()).flatMap(i => i.stops) : []
   // Limit UUIDs in each URL independently of the Data API response page size.
   const batchSize = 40
@@ -64,11 +63,7 @@ async function myCheckIns(): Promise<CheckInRequest[]> {
     const { data } = await supabase.from('cases').select('id, incidents!inner(id, name, starts_at, ends_at, area)').in('id', batch)
       .returns<{ id: string; incidents: PublicIncident }[]>().throwOnError()
     for (const { id, incidents: incident } of data) {
-      const stop = match('me', stops, [incident])[0]?.stop // the Person id only names the result
-      // A GeoJSON ring repeats its first vertex last; count it once.
-      const ring = incident.area.coordinates[0].slice(1)
-      const point = stop ? places[stop.place] : [0, 1].map(axis => ring.reduce((sum, p) => sum + p[axis], 0) / ring.length)
-      cases.set(id, { caseId: id, incident: incident.name, nearestResource: nearestResource(point), reports: [] })
+      cases.set(id, { caseId: id, incident: incident.name, nearestResource: nearestResourceFor(incident, stops), reports: [] })
     }
     const reports = await readPages((from, to) => supabase.from('reports')
       .select('case_id, id, created_at, original_text, body').in('case_id', batch).eq('kind', 'check_in')
@@ -432,3 +427,21 @@ export async function draftGeneralUpdate(incidentId: string): Promise<string> {
   if (error) throw error
   return data.draft
 }
+// A General Update delivered to the signed-in Account as a Notification it hasn't read yet.
+export type GeneralUpdateNotice = { notificationId: string; incident: string; body: string; at: string }
+async function generalUpdateNotices(): Promise<GeneralUpdateNotice[]> {
+  const unread = await readPages((from, to) => supabase.from('notifications').select('id, refers_to')
+    .eq('kind', 'general_update').is('read_at', null).order('created_at', { ascending: false }).order('id').range(from, to).throwOnError())
+  if (!unread.length) return []
+  // ponytail: one `in` list; the view marks notices read as they arrive, so few are ever unread at once.
+  const { data } = await supabase.from('general_updates').select('id, body, created_at, incidents!inner(name)').in('id', unread.map(n => n.refers_to))
+    .returns<{ id: string; body: string; created_at: string; incidents: { name: string } }[]>().throwOnError()
+  const posts = new Map(data.map(u => [u.id, u]))
+  return unread.flatMap(n => {
+    const post = posts.get(n.refers_to)
+    return post ? [{ notificationId: n.id, incident: post.incidents.name, body: post.body, at: post.created_at }] : []
+  })
+}
+export function useGeneralUpdateNotices() { return usePoll(generalUpdateNotices) }
+// Any kind of Notification: the database lets an Account mark only its own.
+export const markNotificationsRead = markIndividualUpdatesRead

@@ -4,7 +4,7 @@ import { divIcon, type LatLngTuple } from 'leaflet'
 import { MapContainer, Marker, Polygon, Tooltip } from 'react-leaflet'
 import { RESOURCE_KIND_LABEL, resources } from '../../supabase/functions/_shared/resources'
 import MapTiles from '../MapTiles'
-import { SimulationLabel, SourceLine, formatTime } from '../ui'
+import { ResourceSource, SimulationLabel, SourceLine, formatTime } from '../ui'
 
 export default function PublicIncident() {
   const { data, error } = useIncidents()
@@ -49,7 +49,7 @@ export default function PublicIncident() {
 
 function IncidentMap({ incident }: { incident?: Incident }) {
   const [tilesFailed, setTilesFailed] = useState(false)
-  const rings = incident?.area.coordinates.map(ring => ring.map(([lng, lat]): LatLngTuple => [lat, lng]))
+  const rings = incident?.area.coordinates.map(ring => ring.map(latLng))
   return <section className="incident-map" aria-label={incident ? `Area for ${incident.name}` : 'Incident map'}>
     {tilesFailed && <div className="tile-error" role="status">
       <p>The map couldn't load. Try refreshing the page. The Incident time window and Resources are listed below.</p>
@@ -58,13 +58,15 @@ function IncidentMap({ incident }: { incident?: Incident }) {
       <MapTiles onError={() => setTilesFailed(true)} />
       {rings && <Polygon positions={rings} pathOptions={{ color: 'var(--color-info-fg)', fillOpacity: 0.18 }} />}
       {/* Hover text only: the Resource list below says the same, with source and time. */}
-      {incident && resources.map(r => <Marker key={r.name} position={[r.at[1], r.at[0]]} icon={resourceIcon} title={`${RESOURCE_KIND_LABEL[r.kind]}: ${r.name}`}>
+      {incident && resources.map(r => <Marker key={r.name} position={latLng(r.at)} icon={resourceIcon} title={`${RESOURCE_KIND_LABEL[r.kind]}: ${r.name}`}>
         <Tooltip>{RESOURCE_KIND_LABEL[r.kind]}: {r.name}</Tooltip>
       </Marker>)}
     </MapContainer>
   </section>
 }
 
+// GeoJSON is longitude first; Leaflet wants latitude first.
+const latLng = ([lng, lat]: readonly number[]): LatLngTuple => [lat, lng]
 const resourceIcon = divIcon({ className: 'resource-marker', iconSize: [16, 16] })
 
 // The same Resources the map marks, as a list: for screen readers and for when map tiles fail.
@@ -76,7 +78,7 @@ function ResourceList() {
       {resources.map(r => <li className="row" key={r.name}>
         <div className="row-main"><h3 className="row-name">{r.name}</h3><span className="tag">{RESOURCE_KIND_LABEL[r.kind]}</span><SimulationLabel /></div>
         <p>{r.availability}</p>
-        <SourceLine source={`${r.source}, last updated`} at={r.updatedAt} />
+        <ResourceSource resource={r} />
       </li>)}
     </ul>
   </section>

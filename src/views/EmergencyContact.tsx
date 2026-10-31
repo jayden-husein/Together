@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { type ContactCase, fileCantReach, type IndividualUpdate, markIndividualUpdatesRead, useContactCases, useIndividualUpdates } from '../lib/checkIns'
 import { SourceLine, StatusBadge, UrgencyTag, statusClass } from '../ui'
+import GeneralUpdateNotices from './GeneralUpdateNotices'
 
 const key = ({ caseId, update }: IndividualUpdate) => `${caseId} ${update.at} ${'status' in update ? update.status : update.urgency}`
 
@@ -22,6 +23,7 @@ export default function EmergencyContact() {
         <h1>Travelers who named you</h1>
         <p className="lede">You get an Individual Update when their Case changes.</p>
       </header>
+      <GeneralUpdateNotices />
       <section className="panel">
         <h2>Their Cases</h2>
         {cases.error && <p role="alert">{cases.error}</p>}

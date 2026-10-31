@@ -1,4 +1,5 @@
 import type { Stop } from '../supabase/functions/_shared/itinerary'
+import type { Resource } from '../supabase/functions/_shared/resources'
 import type { Outcome } from './lib/caseRules'
 import './ui.css'
 
@@ -95,6 +96,9 @@ export function SourceLine({ source, at }: { source: string; at: string }) {
     </p>
   )
 }
+
+/** Where a Resource's details came from and when they were last updated. */
+export const ResourceSource = ({ resource }: { resource: Resource }) => <SourceLine source={`${resource.source}, last updated`} at={resource.updatedAt} />
 
 // Grand Canyon local time: Arizona keeps MST all year.
 const localTime = new Intl.DateTimeFormat(undefined, { timeZone: 'America/Phoenix', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })

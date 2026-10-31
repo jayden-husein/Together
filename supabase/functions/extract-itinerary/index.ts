@@ -1,8 +1,8 @@
-import OpenAI from 'openai'
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0'
 import { proposedStops } from '../_shared/aiOutputCheck.ts'
 import { headers, reply, signedInUser } from '../_shared/http.ts'
 import { localDateTime, maxTextLength, places } from '../_shared/itinerary.ts'
+import { askModel } from '../_shared/model.ts'
 
 const nullable = (schema: object) => ({ anyOf: [schema, { type: 'null' }] })
 const schema = {
@@ -38,21 +38,11 @@ Deno.serve(async request => {
     const text = typeof body?.text === 'string' ? body.text.trim() : ''
     if (!text || text.length > maxTextLength) return reply(400, { message: `Paste 1 to ${maxTextLength} characters.` })
     const today = localDateTime(Date.now()).slice(0, 10)
-    // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API.
-    const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 20_000, maxRetries: 0 })
-    const completion = await dartmouth.chat.completions.create({
-      model: 'openai.gpt-6-luna',
-      max_completion_tokens: 4000,
-      response_format: { type: 'json_schema', json_schema: { name: 'itinerary', schema, strict: true } },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: `Today is ${today}.\n<plans>\n${text.replace(/<\s*\/?\s*plans\b[^>]*>/gi, '')}\n</plans>` },
-      ],
+    const answer = await askModel({
+      name: 'itinerary', schema, system, maxTokens: 4000, timeout: 20_000,
+      user: `Today is ${today}.\n<plans>\n${text.replace(/<\s*\/?\s*plans\b[^>]*>/gi, '')}\n</plans>`,
     })
-    // A cut-off reply or a refusal has no usable JSON.
-    const choice = completion.choices[0]
-    if (choice?.finish_reason !== 'stop' || !choice.message.content) throw new Error(`finish reason ${choice?.finish_reason}`)
-    return reply(200, { stops: proposedStops(text, JSON.parse(choice.message.content)) })
+    return reply(200, { stops: proposedStops(text, answer) })
   } catch (error) {
     console.error('Extract itinerary failed', error instanceof Error ? error.message : 'unknown error')
     return reply(502, { message: 'Could not read your plans.' })
