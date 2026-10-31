@@ -141,3 +141,14 @@ main {
   .case-detail { position: sticky; inset-block-start: calc(var(--header-height) + var(--space-4)); align-self: start; }
 }
 
+
+.coordinator { align-items: start; }
+.coordinator > :not(.rows, .case-detail) { grid-column: 1 / -1; }
+.coordinator > .rows { align-content: start; }
+.coordinator > .rows > .row:has([aria-pressed='true']) { outline: 2px solid var(--color-brand-fg); }
+.case-detail { position: static; min-inline-size: 0; overflow-wrap: anywhere; }
+.case-detail h2 { scroll-margin-block-start: calc(var(--header-height) + var(--space-4)); }
+.case-tools { border-top: 1px solid var(--color-card-edge); }
+.case-tools summary { padding-block: var(--space-3); font-weight: var(--weight-bold); cursor: pointer; }
+.case-action fieldset, .case-action select, .case-action textarea { min-inline-size: 0; max-inline-size: 100%; }
+.case-detail > .case-action { padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-brand-bg); }

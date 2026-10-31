@@ -136,18 +136,20 @@ test('the Coordinator claims a Case', async () => {
   await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'claimed' }))
 })
 
-test('a Coordinator who already owns a Case cannot claim it again', () => {
+test('the named owner can release their Case', async () => {
   data.queue = [{ ...mayaCase, owner: 'Dana Ortiz', ownedByMe: true }]
   data.history = []
   const owner = within(openMayaCase().getByRole('group', { name: 'Owner' }))
-  expect(owner.getByText('Claimed by you')).toBeTruthy()
-  expect((owner.getByRole('button', { name: 'Claim' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(owner.getByText('Claimed by Dana Ortiz (you)')).toBeTruthy()
+  fireEvent.click(owner.getByRole('button', { name: 'Unclaim' }))
+  await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'released' }))
 })
 
 test('the Coordinator records a Contact Attempt and a note', async () => {
   data.queue = [mayaCase]
   data.history = []
   const detail = openMayaCase()
+  fireEvent.click(detail.getByText('Record a contact attempt'))
   const attempt = within(detail.getByRole('group', { name: 'Contact Attempt' }))
   fireEvent.click(attempt.getByLabelText('Not reached'))
   // A Contact Attempt needs its note too.
@@ -156,6 +158,7 @@ test('the Coordinator records a Contact Attempt and a note', async () => {
   fireEvent.change(attempt.getByLabelText('Note'), { target: { value: 'Voicemail' } })
   fireEvent.click(record)
   await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'contact_attempt', reached: false, note: 'Voicemail' }))
+  fireEvent.click(detail.getByText('Add a coordinator note'))
   const note = within(detail.getByRole('group', { name: 'Note' }))
   fireEvent.change(note.getByLabelText('Note'), { target: { value: 'SAR found the camp empty' } })
   fireEvent.click(note.getByRole('button', { name: 'Add note' }))
@@ -165,7 +168,9 @@ test('the Coordinator records a Contact Attempt and a note', async () => {
 test('a note can say which Report it follows up', async () => {
   data.queue = [mayaCase]
   data.history = [item({ id: 'r1', entry: 'check_in', by: 'Maya Chen', at: '2026-10-31T14:12:00Z', status: 'needs_assistance', text: 'Water rising' })]
-  const note = within(openMayaCase().getByRole('group', { name: 'Note' }))
+  const detail = openMayaCase()
+  fireEvent.click(detail.getByText('Add a coordinator note'))
+  const note = within(detail.getByRole('group', { name: 'Note' }))
   fireEvent.change(note.getByLabelText('From Report'), { target: { value: 'r1' } })
   fireEvent.change(note.getByLabelText('Note'), { target: { value: 'SAR reached the camp' } })
   fireEvent.click(note.getByRole('button', { name: 'Add note' }))
@@ -175,11 +180,15 @@ test('a note can say which Report it follows up', async () => {
 test('resolving needs exactly one outcome', async () => {
   data.queue = [mayaCase]
   data.history = []
-  const resolve = within(openMayaCase().getByRole('group', { name: 'Resolve' }))
+  const detail = openMayaCase()
+  fireEvent.click(detail.getByText('Resolve case'))
+  const resolve = within(detail.getByRole('group', { name: 'Resolve' }))
   const button = resolve.getByRole('button', { name: 'Resolve' }) as HTMLButtonElement
   expect(button.disabled).toBe(true)
   // Radios: choosing one outcome replaces the other.
   fireEvent.click(resolve.getByLabelText('Reached'))
+  fireEvent.click(resolve.getByRole('button', { name: 'Clear selection' }))
+  expect(button.disabled).toBe(true)
   fireEvent.click(resolve.getByLabelText('Assistance provided'))
   fireEvent.click(button)
   await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'resolved', outcome: 'assistance_provided' }))

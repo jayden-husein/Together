@@ -1,5 +1,5 @@
 import PotentialIncidentReview from './PotentialIncidentReview'
-import { type FormEvent, type ReactNode, useId, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
 import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, UrgencyTag, formatTime, statusClass } from '../ui'
 
@@ -44,12 +44,12 @@ export default function Coordinator() {
             <li className={`row ${statusClass(c.status)}`} key={c.caseId}>
               <div className="row-main">
                 <button type="button" className="link-button row-name" aria-pressed={c.caseId === selected}
-                  onClick={() => setSelected(c.caseId)}>{c.traveler}</button>
+                  onClick={() => setSelected(c.caseId === selected ? undefined : c.caseId)}>{c.traveler}</button>
                 <StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} />
               </div>
               <p className="lede">{c.incident}</p>
               {c.explanation && <p>Matched stop: {c.explanation}</p>}
-              {c.owner && <p className="lede">Claimed by {c.owner}</p>}
+              <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
               <SourceLine source={SOURCE[c.status]} at={c.at} />
             </li>
           ))}
@@ -70,13 +70,15 @@ export default function Coordinator() {
 
 const ENTRY: Record<CaseHistoryItem['entry'], string> = {
   check_in: 'Check-in', cant_reach: "Can't-reach report", opened: 'Case opened', check_in_request_sent: 'Check-in Request sent',
-  urgency_proposed: 'Urgency proposed', urgency_changed: 'Urgency changed', claimed: 'Claimed', contact_attempt: 'Contact Attempt',
+  urgency_proposed: 'Urgency proposed', urgency_changed: 'Urgency changed', claimed: 'Claimed', released: 'Claim released', contact_attempt: 'Contact Attempt',
   note: 'Note', resolved: 'Resolved',
 }
 
 const OUTCOMES = Object.entries(OUTCOME_LABEL) as [Outcome, string][]
 
 function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { heading.current?.focus() }, [])
   const { data, error, reload } = useCaseHistory(c.caseId)
   // Only Reports can be followed up, not other Case events.
   const reports = data?.filter(item => item.entry === 'check_in' || item.entry === 'cant_reach') ?? []
@@ -87,21 +89,29 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
   }
   return (
     <section className="panel case-detail" aria-label={`Case: ${c.traveler}`}>
-      <h2>{c.traveler}</h2>
+      <header className="view-header"><h2 tabIndex={-1} ref={heading}>{c.traveler}</h2>
+        <p>{c.incident}</p><div><StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} /></div>
+      </header>
       <p className="lede">Notes stay with Coordinators. Emergency Contacts see only the outcome.</p>
       {c.explanation && <p>Matched stop: {c.explanation}</p>}
       {c.itineraryText && <blockquote aria-label="What the traveler pasted for their Itinerary">{c.itineraryText}</blockquote>}
       {/* Another Coordinator can take a Case over; claiming your own again would only repeat the entry. */}
-      <EventForm legend="Owner" submitLabel="Claim" note="none" disabled={c.ownedByMe} onSubmit={() => record({ action: 'claimed' })}>
-        <p>{c.ownedByMe ? 'Claimed by you' : c.owner ? `Claimed by ${c.owner}` : 'Unclaimed'}</p>
+      <EventForm legend="Owner" submitLabel={c.ownedByMe ? 'Unclaim' : c.owner ? 'Take over case' : 'Claim'} note="none" onSubmit={() => record({ action: c.ownedByMe ? 'released' : 'claimed' })}>
+        <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
       </EventForm>
+      <details className="case-tools"><summary>Record a contact attempt</summary>
       <EventForm legend="Contact Attempt" submitLabel="Record" note="required" reports={reports}
         choices={[['reached', 'Reached'], ['not_reached', 'Not reached']]}
         onSubmit={(choice, { note, ...extra }) => record({ action: 'contact_attempt', reached: choice === 'reached', note: note!, ...extra })} />
+      </details>
+      <details className="case-tools"><summary>Add a coordinator note</summary>
       <EventForm legend="Note" submitLabel="Add note" note="required" reports={reports}
         onSubmit={(_, { note, ...extra }) => record({ action: 'note', note: note!, ...extra })} />
+      </details>
+      <details className="case-tools"><summary>{c.status === 'resolved' ? 'Correct the outcome' : 'Resolve case'}</summary>
       <EventForm legend="Resolve" submitLabel="Resolve" note="optional" reports={reports} choices={OUTCOMES}
         onSubmit={(outcome, extra) => record({ action: 'resolved', outcome: outcome as Outcome, ...extra })} />
+      </details>
       <h3>History</h3>
       {error && <p role="alert">{error}</p>}
       {!data ? (
@@ -174,7 +184,7 @@ function EventForm({ legend, submitLabel, choices = [], note, reports = [], disa
 
   return (
     <form className="case-action" onSubmit={submit}>
-      <fieldset>
+      <fieldset disabled={sending}>
         <legend>{legend}</legend>
         {children}
         {choices.length > 0 && (
@@ -185,12 +195,13 @@ function EventForm({ legend, submitLabel, choices = [], note, reports = [], disa
                 {label}
               </label>
             ))}
+            {choice && <button type="button" className="link-button" onClick={() => setChoice(undefined)}>Clear selection</button>}
           </div>
         )}
         {note !== 'none' && (
           <>
             <label htmlFor={`${id}-note`}>Note</label>
-            <textarea id={`${id}-note`} rows={2} value={text} onChange={e => setText(e.target.value)} />
+            <textarea id={`${id}-note`} rows={2} required={note === 'required'} value={text} onChange={e => setText(e.target.value)} />
           </>
         )}
         {reports.length > 0 && (
