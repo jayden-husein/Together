@@ -7,8 +7,8 @@ export type CheckInStatus = 'safe' | 'needs_assistance'
 export type CheckInReport = { id: string; status: CheckInStatus; description: string | null; at: string }
 export type CheckInRequest = { caseId: string; incident: string; reports: CheckInReport[] }
 // `at`: when the status was set (the latest Report or resolution), else when the Case opened.
-// `owner`: the Coordinator with the latest claim, if any.
-export type QueueCase = { caseId: string; traveler: string; incident: string; at: string; owner: string | null } & CaseStatus
+// `owner`: the Coordinator with the latest claim, if any; `ownedByMe`: that claim is the signed-in Account's.
+export type QueueCase = { caseId: string; traveler: string; incident: string; at: string; owner: string | null; ownedByMe: boolean } & CaseStatus
 export type IndividualUpdate = {
   caseId: string
   traveler: string
@@ -142,6 +142,7 @@ async function queue(): Promise<QueueCase[]> {
     .order('created_at', { referencedTable: 'case_events', ascending: false })
     .order('created_at').order('id').range(from, to).returns<QueueRow[]>().throwOnError())
   const names = await coordinatorNames()
+  const { data: { session } } = await supabase.auth.getSession()
   return orderQueue(rows.map(row => {
     const history: CaseHistoryEntry[] = row.reports.map(report => ({
       at: report.created_at, outcome: null,
@@ -154,7 +155,8 @@ async function queue(): Promise<QueueCase[]> {
     const at = status.status === 'resolved' ? resolutions[0]?.created_at : row.reports[0]?.created_at
     const claim = row.case_events.find(e => e.action === 'claimed')
     const owner = claim ? names(claim.actor) : null
-    return { caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, at: at ?? row.created_at, owner, ...status }
+    const ownedByMe = !!claim?.actor && claim.actor === session?.user.id
+    return { caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, at: at ?? row.created_at, owner, ownedByMe, ...status }
   }))
 }
 
@@ -237,7 +239,7 @@ export function useCaseHistory(caseId: string) {
 // `fromReport`: the id of one of the Case's Reports that the entry follows up.
 export type CoordinatorAction =
   | { action: 'claimed' }
-  | { action: 'contact_attempt'; reached: boolean; note?: string; fromReport?: string }
+  | { action: 'contact_attempt'; reached: boolean; note: string; fromReport?: string }
   | { action: 'note'; note: string; fromReport?: string }
   | { action: 'resolved'; outcome: Outcome; note?: string; fromReport?: string }
 

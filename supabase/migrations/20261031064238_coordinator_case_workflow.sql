@@ -25,7 +25,7 @@ begin
   if p_action not in ('claimed', 'contact_attempt', 'note', 'resolved') then
     raise exception 'A Coordinator can claim, record a Contact Attempt, add a note or resolve';
   end if;
-  if p_action = 'note' and coalesce(p_note, '') !~ '[^[:space:]]' then
+  if p_action in ('note', 'contact_attempt') and coalesce(p_note, '') !~ '[^[:space:]]' then
     raise exception 'Write the note';
   end if;
   select * into strict target from public.cases where id = p_case_id;

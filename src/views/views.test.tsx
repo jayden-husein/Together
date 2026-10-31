@@ -65,9 +65,9 @@ test('the traveler sees what they sent and when, newest first', () => {
 
 test('the queue lists Cases with status badges in the order Case rules return', () => {
   data.queue = [
-    { caseId: 'c1', traveler: 'Maya Chen', incident: 'Flash flood at Phantom Ranch', status: 'needs_assistance', at: '2026-10-31T14:12:00Z', owner: null },
-    { caseId: 'c2', traveler: 'Priya Natarajan', incident: 'Flash flood at Phantom Ranch', status: 'unconfirmed', at: '2026-10-31T13:48:00Z', owner: null },
-    { caseId: 'c3', traveler: 'Tom Alvarez', incident: 'Flash flood at Phantom Ranch', status: 'safe', at: '2026-10-31T13:55:00Z', owner: null },
+    { caseId: 'c1', traveler: 'Maya Chen', incident: 'Flash flood at Phantom Ranch', status: 'needs_assistance', at: '2026-10-31T14:12:00Z', owner: null, ownedByMe: false },
+    { caseId: 'c2', traveler: 'Priya Natarajan', incident: 'Flash flood at Phantom Ranch', status: 'unconfirmed', at: '2026-10-31T13:48:00Z', owner: null, ownedByMe: false },
+    { caseId: 'c3', traveler: 'Tom Alvarez', incident: 'Flash flood at Phantom Ranch', status: 'safe', at: '2026-10-31T13:55:00Z', owner: null, ownedByMe: false },
   ]
   render(<Coordinator />)
   const rows = within(screen.getByRole('list', { name: 'Case queue' })).getAllByRole('listitem')
@@ -112,7 +112,7 @@ test('unread Individual Updates are marked New, marked read, and stay New while 
   expect(markRead).toHaveBeenCalledTimes(1)
 })
 
-const mayaCase: QueueCase = { caseId: 'c1', traveler: 'Maya Chen', incident: 'Flash flood at Phantom Ranch', status: 'needs_assistance', at: '2026-10-31T14:12:00Z', owner: null }
+const mayaCase: QueueCase = { caseId: 'c1', traveler: 'Maya Chen', incident: 'Flash flood at Phantom Ranch', status: 'needs_assistance', at: '2026-10-31T14:12:00Z', owner: null, ownedByMe: false }
 const item = (fields: Partial<CaseHistoryItem> & Pick<CaseHistoryItem, 'id' | 'entry' | 'by' | 'at'>): CaseHistoryItem =>
   ({ status: null, reached: null, outcome: null, urgency: null, text: null, fromReport: null, ...fields })
 
@@ -135,14 +135,25 @@ test('the Coordinator claims a Case', async () => {
   await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'claimed' }))
 })
 
+test('a Coordinator who already owns a Case cannot claim it again', () => {
+  data.queue = [{ ...mayaCase, owner: 'Dana Ortiz', ownedByMe: true }]
+  data.history = []
+  const owner = within(openMayaCase().getByRole('group', { name: 'Owner' }))
+  expect(owner.getByText('Claimed by you')).toBeTruthy()
+  expect((owner.getByRole('button', { name: 'Claim' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
 test('the Coordinator records a Contact Attempt and a note', async () => {
   data.queue = [mayaCase]
   data.history = []
   const detail = openMayaCase()
   const attempt = within(detail.getByRole('group', { name: 'Contact Attempt' }))
   fireEvent.click(attempt.getByLabelText('Not reached'))
+  // A Contact Attempt needs its note too.
+  const record = attempt.getByRole('button', { name: 'Record' }) as HTMLButtonElement
+  expect(record.disabled).toBe(true)
   fireEvent.change(attempt.getByLabelText('Note'), { target: { value: 'Voicemail' } })
-  fireEvent.click(attempt.getByRole('button', { name: 'Record' }))
+  fireEvent.click(record)
   await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'contact_attempt', reached: false, note: 'Voicemail' }))
   const note = within(detail.getByRole('group', { name: 'Note' }))
   fireEvent.change(note.getByLabelText('Note'), { target: { value: 'SAR found the camp empty' } })

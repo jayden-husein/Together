@@ -84,12 +84,13 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
     <section className="panel case-detail" aria-label={`Case: ${c.traveler}`}>
       <h2>{c.traveler}</h2>
       <p className="lede">Notes stay with Coordinators. Emergency Contacts see only the outcome.</p>
-      <EventForm legend="Owner" submitLabel="Claim" note="none" onSubmit={() => record({ action: 'claimed' })}>
-        <p>{c.owner ? `Claimed by ${c.owner}` : 'Unclaimed'}</p>
+      {/* Another Coordinator can take a Case over; claiming your own again would only repeat the entry. */}
+      <EventForm legend="Owner" submitLabel="Claim" note="none" disabled={c.ownedByMe} onSubmit={() => record({ action: 'claimed' })}>
+        <p>{c.ownedByMe ? 'Claimed by you' : c.owner ? `Claimed by ${c.owner}` : 'Unclaimed'}</p>
       </EventForm>
-      <EventForm legend="Contact Attempt" submitLabel="Record" note="optional" reports={reports}
+      <EventForm legend="Contact Attempt" submitLabel="Record" note="required" reports={reports}
         choices={[['reached', 'Reached'], ['not_reached', 'Not reached']]}
-        onSubmit={(choice, extra) => record({ action: 'contact_attempt', reached: choice === 'reached', ...extra })} />
+        onSubmit={(choice, { note, ...extra }) => record({ action: 'contact_attempt', reached: choice === 'reached', note: note!, ...extra })} />
       <EventForm legend="Note" submitLabel="Add note" note="required" reports={reports}
         onSubmit={(_, { note, ...extra }) => record({ action: 'note', note: note!, ...extra })} />
       <EventForm legend="Resolve" submitLabel="Resolve" note="optional" reports={reports} choices={OUTCOMES}
@@ -128,12 +129,13 @@ function HistoryEntry({ item, from }: { item: CaseHistoryItem; from?: CaseHistor
 
 // One Coordinator action: at most one choice from `choices`, a note, the Report it follows up, and a submit button.
 // `onSubmit` gets the note and Report only when given.
-function EventForm({ legend, submitLabel, choices = [], note, reports = [], onSubmit, children }: {
+function EventForm({ legend, submitLabel, choices = [], note, reports = [], disabled = false, onSubmit, children }: {
   legend: string
   submitLabel: string
   choices?: [string, string][]
   note: 'none' | 'optional' | 'required'
   reports?: CaseHistoryItem[]
+  disabled?: boolean
   onSubmit: (choice: string, extra: { note?: string; fromReport?: string }) => Promise<void>
   children?: ReactNode
 }) {
@@ -143,7 +145,7 @@ function EventForm({ legend, submitLabel, choices = [], note, reports = [], onSu
   const [fromReport, setFromReport] = useState('')
   const [sending, setSending] = useState(false)
   const [failure, setFailure] = useState<string>()
-  const ready = (!choices.length || choice !== undefined) && (note !== 'required' || text.trim() !== '')
+  const ready = !disabled && (!choices.length || choice !== undefined) && (note !== 'required' || text.trim() !== '')
 
   async function submit(e: FormEvent) {
     e.preventDefault()
