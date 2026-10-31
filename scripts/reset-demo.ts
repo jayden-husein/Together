@@ -1,5 +1,6 @@
 // Deletes and reloads only the demo data: the rows flagged `demo` and the demo Accounts.
 // Usage: npm run reset-demo -- staging|production
+import { floodReadings } from '../supabase/functions/_shared/flood.ts'
 import { confirmedStops } from '../supabase/functions/_shared/itinerary.ts'
 import { accounts, serverClient, password, signIn, url, publishableKey } from './demo.ts'
 
@@ -10,8 +11,10 @@ const check = <T>({ data, error }: { data: T; error: unknown }) => {
 }
 
 // Check that confirmation is deployed before clearing the previous demo.
-const probe = await fetch(url + '/functions/v1/confirm-itinerary', { headers: { apikey: publishableKey } })
-if (probe.status !== 405) throw new Error('Deploy confirm-itinerary to the target project before resetting the demo.')
+for (const name of ['confirm-itinerary', 'potential-incident']) {
+  const probe = await fetch(url + '/functions/v1/' + name, { headers: { apikey: publishableKey } })
+  if (probe.status !== 405) throw new Error('Deploy ' + name + ' before resetting the demo.')
+}
 check(await db.rpc('delete_demo_data'))
 
 const names = ['Maya', 'Alex', 'Jordan', 'Quinn', 'Avery', 'Riley', 'Sam', 'Taylor', 'Morgan', 'Sage',
@@ -37,21 +40,6 @@ const [maya] = check(await db.from('persons').insert({ account_id: ids.maya, nam
 check(await db.from('emergency_contacts').insert({ person_id: maya.id, account_id: ids.emergencyContact, demo }))
 check(await db.from('coordinators').insert({ account_id: ids.coordinator, name: 'Dana Ortiz', demo }))
 
-// Hand-made flash flood along Bright Angel Creek at Phantom Ranch and the Black Bridge (GeoJSON is [lng, lat]).
-const [incident] = check(
-  await db
-    .from('incidents')
-    .insert({
-      name: 'Flash flood at Phantom Ranch',
-      area: {
-        type: 'Polygon',
-        coordinates: [[[-112.1, 36.095], [-112.085, 36.095], [-112.085, 36.112], [-112.1, 36.112], [-112.1, 36.095]]],
-      },
-      starts_at: new Date(Date.now() - 30 * 60_000).toISOString(),
-      demo,
-    })
-    .select(),
-)
 // Use the same authenticated confirmation as manual entry so the seed exercises Match.
 const hour = 60 * 60_000
 const now = Date.now()
@@ -76,4 +64,6 @@ for (const [i, { name, email }] of travelers.entries()) {
   // One group overlaps, one stays on the rim, one visited before the flood.
   await confirm(email, i % 3 === 1 ? 'Mather Point' : 'Phantom Ranch', i % 3 === 2 ? now - 24 * hour : now + hour)
 }
-console.log(`Reset 21 traveler Itineraries for Incident ${incident.id}.`)
+const coordinator = await signIn(accounts.coordinator)
+const pending = check(await coordinator.functions.invoke('potential-incident', { body: { action: 'ingest', readings: floodReadings() } }))
+console.log(`Reset 21 traveler Itineraries. Potential incident ${pending.id} awaits verification.`)
