@@ -1,12 +1,13 @@
 -- Keep the traveler's pasted plans with the confirmed Itinerary (#11).
+-- Same as 20261031072939's confirm_itinerary and confirm_matched_itinerary, plus p_original_text.
+drop function public.confirm_matched_itinerary(uuid, uuid, uuid, jsonb, jsonb, bigint);
 drop function public.confirm_itinerary(uuid, uuid, uuid, jsonb, jsonb);
+
 create function public.confirm_itinerary(p_report uuid, p_account uuid, p_person uuid, p_stops jsonb, p_matches jsonb, p_original_text text default null)
 returns void language plpgsql security invoker set search_path = '' as $$
 declare
   traveler public.persons;
   decision jsonb;
-  opened uuid;
-  case_demo boolean;
 begin
   select * into strict traveler from public.persons where id = p_person and account_id = p_account;
   insert into public.reports (id, kind, person_id, source, submitted_by, original_text, body, demo)
@@ -18,18 +19,20 @@ begin
     raise exception 'Invalid confirmation id';
   end if;
   for decision in select value from jsonb_array_elements(p_matches) loop
-    insert into public.cases (incident_id, person_id, demo)
-      select i.id, traveler.id, traveler.demo or i.demo from public.incidents i
-      where i.id = (decision->>'incidentId')::uuid
-      on conflict (incident_id, person_id) do nothing returning id, demo into opened, case_demo;
-    if opened is not null then
-      insert into public.case_events (case_id, action, actor, source_report_id, note, demo)
-        values (opened, 'opened', null, p_report,
-          format('%s (%s to %s UTC)', decision#>>'{stop,place}',
-            to_char((decision#>>'{stop,start}')::timestamptz at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US'),
-            to_char((decision#>>'{stop,end}')::timestamptz at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')), case_demo);
-    end if;
+    perform public.open_matched_case(p_report, traveler.id, (decision->>'incidentId')::uuid, decision->'stop');
   end loop;
 end $$;
-revoke all on function public.confirm_itinerary(uuid,uuid,uuid,jsonb,jsonb,text) from public, anon, authenticated;
-grant execute on function public.confirm_itinerary(uuid,uuid,uuid,jsonb,jsonb,text) to service_role;
+
+create function public.confirm_matched_itinerary(p_report uuid, p_account uuid, p_person uuid, p_stops jsonb,
+  p_matches jsonb, p_incident_count bigint, p_original_text text default null)
+returns void language plpgsql security invoker set search_path = '' as $$
+begin
+  perform pg_advisory_xact_lock(120012);
+  if p_incident_count <> (select count(*) from public.incidents) then
+    raise exception 'Incidents changed during matching' using errcode = '40001';
+  end if;
+  perform public.confirm_itinerary(p_report, p_account, p_person, p_stops, p_matches, p_original_text);
+end $$;
+
+revoke all on function public.confirm_itinerary, public.confirm_matched_itinerary from public, anon, authenticated;
+grant execute on function public.confirm_itinerary, public.confirm_matched_itinerary to service_role;

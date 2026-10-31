@@ -42,7 +42,7 @@ These need someone's own accounts, so an agent can't do them. They're slotted in
    - `VITE_SUPABASE_PUBLISHABLE_KEY` = the production publishable key (Supabase → production project → Project Settings → API Keys; it starts with `sb_publishable_`).
 5. **Deploy.** From now on every merge to `main` redeploys the main URL.
 
-Never put the secret key or the Dartmouth Chat API key in Vercel; those are Supabase Edge Function secrets.
+Never put the secret key or an AI API key (Dartmouth Chat or Claude) in Vercel; those are Supabase Edge Function secrets.
 
 ### Vercel previews (once)
 

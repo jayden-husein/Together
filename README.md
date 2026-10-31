@@ -20,7 +20,7 @@ What works in the final build. Only list a feature here once it works end to end
 ## Simulated
 
 - **People**: Maya, her Emergency Contact, about 20 other travelers, and one unrelated Account used to test access. All of them are made up.
-- **Sources**: two stream gauge readings and one weather warning, written by hand. No live sensor, weather or news feed is connected.
+- **Sources**: a stream gauge reading, a weather warning and a news snippet, written by hand. No live sensor, weather or news feed is connected.
 - **Incident**: a flash flood near the overlook, flagged as a simulation.
 - **Resources**: shelters, water and first aid, made up, each showing a made-up source and last-updated time.
 - **Places**: the place list uses real Grand Canyon places and their real coordinates. Only the people and events are fictional.
@@ -29,12 +29,12 @@ The demo seed ([#6](https://github.com/jayden-husein/Together/issues/6)) marks a
 
 ## How the AI is used
 
-OpenAI's GPT-6 Luna, reached through the Dartmouth Chat API, has three jobs ([ADR-0003](docs/adr/0003-gpt-6-luna-via-dartmouth-chat.md)). It never makes the final decision in any of them. It is called only from Supabase Edge Functions, so the API key never reaches the browser. Its replies are structured, and plain code checks every reply before it is used: each quote must appear in the input, places must come from the fixed list, and any coordinates the model supplies are ignored. If the AI fails or times out, you can still do the job by hand. Together shows no percentages or confidence scores.
+The AI has three jobs, and it never makes the final decision in any of them. Itinerary extraction uses OpenAI's GPT-6 Luna through the Dartmouth Chat API ([ADR-0003](docs/adr/0003-gpt-6-luna-via-dartmouth-chat.md)). The Potential incident summary still uses Claude. It is called only from Supabase Edge Functions, so the API key never reaches the browser. Its replies are structured, and plain code checks every reply before it is used: each quote must appear in the input, places must come from the fixed list, and any coordinates the model supplies are ignored. If the AI fails or times out, you can still do the job by hand. Together shows no percentages or confidence scores.
 
 | Job | What the AI does | Human checkpoint |
 | --- | --- | --- |
 | Itinerary extraction | Turns a traveler's pasted plans into stops at known places, each with a time window and a quote from the text. A stop missing a date or time is marked for clarification. | The **traveler** confirms or corrects the stops. Only confirmed stops can open a Case. |
-| Potential incident | Summarizes the source readings (the gauges and the weather warning) into a Potential incident, quoting each source. The incident area always comes from the source's own geometry, never from the model. | A **Coordinator** verifies or dismisses it. It affects nobody until verified. |
+| Potential incident | Summarizes the source readings (the gauge, weather warning and news snippet) into a Potential incident, quoting each source. The incident area always comes from the source's own geometry, never from the model. | A **Coordinator** verifies or dismisses it. It affects nobody until verified. |
 | Urgency triage | Proposes Immediate, Urgent or Can wait for a Needs assistance Check-in, quoting the traveler's words. Anything it can't assess becomes Untriaged, which sorts to the top of the queue. | The **Coordinator** can change the Urgency, and their change always wins. |
 
 Matching stops to an Incident, deciding who can see what, and choosing who gets Notifications are done by plain code and database rules, not by the AI.
@@ -43,7 +43,7 @@ Matching stops to an Incident, deciding who can see what, and choosing who gets 
 
 - **Polling, not realtime.** Shared data refreshes every 3 seconds, so updates can arrive up to 3 seconds late.
 - **A fixed place list, not geocoding.** Itinerary stops must be one of a short list of known Grand Canyon places.
-- **Made-up sources, not live feeds.** The gauge readings and weather warning are fixed demo data.
+- **Made-up sources, not live feeds.** The gauge reading, weather warning and news snippet are fixed demo data.
 - **Pre-linked Emergency Contacts, not invites.** The demo seed links Maya to her Emergency Contact. There is no flow for inviting a contact or for the contact to accept.
 - **Demo Accounts only.** The product would let people sign up themselves. The demo leaves that out and uses only the demo Accounts that `npm run reset-demo` creates.
 - **In-app Notifications only.** There is no SMS, email or push delivery. Someone sees a Notification only when they open the app.
@@ -115,7 +115,7 @@ You need git and Node.js 22.22+ or 24.15+ (the test runner needs these versions)
 
 Other commands: `npm test` runs the tests, `npm run typecheck` runs the type checker, and `npm run build` makes a production build.
 
-`.env` holds secrets and is ignored by git. Never put the Supabase secret key or the Dartmouth Chat API key in a `VITE_` variable, because Vite copies those into the browser bundle.
+`.env` holds secrets and is ignored by git. Never put the Supabase secret key or an AI API key (Dartmouth Chat or Claude) in a `VITE_` variable, because Vite copies those into the browser bundle.
 
 ## Staging workflow
 
@@ -171,3 +171,9 @@ These are the actual results of the run-through on fixed demo data. Each check r
 | 16 | The public page shows the Incident, Resources and General Updates without login and with no private details about anyone | | |
 | 17 | Two browser sessions see each other's changes within a few seconds | | |
 | 18 | Reset restores the demo story without touching other rows | | |
+
+### Run the flood verification demo
+
+Deploy the `potential-incident`, `extract-itinerary` and `confirm-itinerary` Edge Functions after applying migrations. Configure the server-side `DARTMOUTH_CHAT_API_KEY` secret for Itinerary extraction. Configure the server-side `ANTHROPIC_API_KEY` secret for Claude summaries. `ANTHROPIC_MODEL` optionally selects the model. A missing key, timeout or invalid quote produces a labeled pre-written summary.
+
+Run `npm run reset-demo -- staging`, then open the Coordinator view to review the three readings and warning polygon. Verify the time window to open Cases and send Check-in Requests. To exercise concurrent verification and the access checks against a freshly reset staging demo, run `npm run access-check -- staging --verify`. Reset again to restore the pending review.

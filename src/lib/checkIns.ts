@@ -261,3 +261,27 @@ export async function recordCaseEvent(caseId: string, event: CoordinatorAction) 
   }).throwOnError()
 }
 export function useIndividualUpdates() { return usePoll(individualUpdates) }
+
+export type PotentialIncident = {
+  id: string; name: string; summary: string; starts_at: string; fallback: boolean
+  sources: { name: string; text: string; quote: string }[]
+  area: { type: 'Polygon'; coordinates: number[][][] }
+}
+
+async function pendingIncidents() {
+  return readPages((from, to) => supabase.from('potential_incidents')
+    .select('id,name,summary,starts_at,fallback,sources,area').is('incident_id', null)
+    .order('starts_at').order('id').range(from, to).returns<PotentialIncident[]>().throwOnError())
+}
+export function usePendingIncidents() { return usePoll(pendingIncidents) }
+export async function verifyIncident(id: string, start: string, end: string | null) {
+  const { error } = await supabase.functions.invoke('potential-incident', { body: { action: 'verify', id, start, end } })
+  if (error) throw error
+}
+
+async function latestIncident() {
+  const { data } = await supabase.from('incidents').select('id,name,created_at')
+    .order('created_at', { ascending: false }).limit(1).throwOnError()
+  return data
+}
+export function useLatestIncident() { return usePoll(latestIncident) }

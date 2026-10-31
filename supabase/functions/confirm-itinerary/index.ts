@@ -20,18 +20,24 @@ Deno.serve(async request => {
     const { data: person } = await db.from('persons').select('id').eq('account_id', user.id).maybeSingle().throwOnError()
     if (!person) return reply(403, { message: 'A traveler account is required.' })
     const now = new Date().toISOString()
-    const matches = []
-    for (let offset = 0; ; offset += 100) {
-      const { data } = await db.from('incidents').select('id,area,starts_at,ends_at,cases(person_id)')
-        .eq('cases.person_id', person.id)
-        .lte('starts_at', now).or('ends_at.is.null,ends_at.gte.' + now)
-        .order('id').range(offset, offset + 99).throwOnError()
-      const existing = data.flatMap(incident => incident.cases.map(c => ({ personId: c.person_id, incidentId: incident.id })))
-      matches.push(...match(person.id, stops, data, existing))
-      if (data.length < 100) break
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { count } = await db.from('incidents').select('id', { head: true, count: 'exact' }).throwOnError()
+      const matches = []
+      for (let offset = 0; ; offset += 100) {
+        const { data } = await db.from('incidents').select('id,area,starts_at,ends_at,cases(person_id)')
+          .eq('cases.person_id', person.id)
+          .lte('starts_at', now).or('ends_at.is.null,ends_at.gte.' + now)
+          .order('id').range(offset, offset + 99).throwOnError()
+        const existing = data.flatMap(incident => incident.cases.map(c => ({ personId: c.person_id, incidentId: incident.id })))
+        matches.push(...match(person.id, stops, data, existing))
+        if (data.length < 100) break
+      }
+      const { error } = await db.rpc('confirm_matched_itinerary', { p_report: body.id, p_account: user.id,
+        p_person: person.id, p_stops: stops, p_matches: matches, p_incident_count: count, p_original_text: originalText })
+      if (!error) return reply(200, { message: 'Itinerary confirmed.' })
+      if (error.code !== '40001') throw error
     }
-    await db.rpc('confirm_itinerary', { p_report: body.id, p_account: user.id, p_person: person.id, p_stops: stops, p_matches: matches, p_original_text: originalText }).throwOnError()
-    return reply(200, { message: 'Itinerary confirmed.' })
+    return reply(409, { message: 'Incidents changed. Try confirming again.' })
   } catch (error) {
     console.error('Confirm itinerary failed', error instanceof Error ? error.message : 'database error')
     return reply(500, { message: 'Could not confirm your Itinerary.' })
