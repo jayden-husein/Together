@@ -24,9 +24,9 @@ afterEach(() => {
 })
 
 test.each([
-  ['#/traveler', 'Sign in'],
-  ['#/contact', 'Sign in'],
-  ['#/coordinator', 'Sign in'],
+  ['#/traveler', 'Welcome back'],
+  ['#/contact', 'Welcome back'],
+  ['#/coordinator', 'Welcome back'],
   ['', 'Incident'],
 ])('signed out, route %s shows %s with the Simulation label', async (hash, heading) => {
   window.location.hash = hash
@@ -41,7 +41,7 @@ test('following a nav link switches the view', async () => {
     window.location.hash = '#/coordinator'
     window.dispatchEvent(new HashChangeEvent('hashchange'))
   })
-  expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back' })).toBeTruthy()
 })
 
 test('public incident page shows the Simulation label and OpenStreetMap attribution', () => {
