@@ -17,5 +17,6 @@ Single-context: one root `GLOSSARY.md` and `docs/adr/`. See `docs/agents/domain.
 Merging to `main` deploys `supabase/migrations/` to the production database via the Supabase GitHub integration. So every schema change ships as a migration:
 
 - Create it with `npx supabase migration new <name>`, then write the SQL in the generated file.
+- Push it to the **staging** project and check it before merging: `set -a; source .env; set +a; npx supabase db push --db-url "$STAGING_DB_URL"`. No staging values in `.env` yet? Run `scripts/setup-staging.sh` (a human runs it; it opens the Supabase dashboard).
 - Applied migrations are history: fix mistakes with a new migration, leaving merged ones untouched.
 - Inspect the live schema and data through the `supabase` MCP server (read-only) before writing a migration.
