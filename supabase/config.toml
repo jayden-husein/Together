@@ -419,5 +419,9 @@ enabled = true
 # The handler verifies the session with Auth, including projects using asymmetric keys.
 verify_jwt = false
 
+[functions.extract-itinerary]
+# The handler verifies the session with Auth, including projects using asymmetric keys.
+verify_jwt = false
+
 [functions.potential-incident]
 verify_jwt = false

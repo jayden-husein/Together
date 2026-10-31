@@ -8,8 +8,9 @@ export type CheckInReport = { id: string; status: CheckInStatus; description: st
 export type CheckInRequest = { caseId: string; incident: string; reports: CheckInReport[] }
 // `at`: when the status was set (the latest Report or resolution), else when the Case opened.
 // `owner`: the Coordinator with the latest claim, if any; `ownedByMe`: that claim is the signed-in Account's.
+// `itineraryText`: what the traveler pasted for the Itinerary that opened the Case, if anything.
 export type QueueCase = {
-  caseId: string; traveler: string; incident: string; explanation?: string; at: string; owner: string | null; ownedByMe: boolean
+  caseId: string; traveler: string; incident: string; explanation?: string; itineraryText?: string; at: string; owner: string | null; ownedByMe: boolean
 } & CaseStatus
 export type IndividualUpdate = {
   caseId: string
@@ -124,7 +125,7 @@ type QueueRow = {
   persons: { name: string }
   incidents: { name: string }
   reports: { kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
-  opening?: { note: string | null }[]
+  opening?: { note: string | null; reports: { original_text: string | null } | null }[]
   case_events: { action: 'claimed' | 'released' | 'resolved'; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
 }
 
@@ -139,7 +140,7 @@ async function queue(): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
   const rows = await readPages((from, to) => supabase.from('cases').select(
-    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(action, actor, created_at, outcome), opening:case_events(note)',
+    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(action, actor, created_at, outcome), opening:case_events(note, reports(original_text))',
   ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'released', 'resolved']).eq('opening.action', 'opened')
     .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
     .order('created_at', { referencedTable: 'case_events', ascending: false })
@@ -163,6 +164,7 @@ async function queue(): Promise<QueueCase[]> {
     const ownedByMe = !!claim?.actor && claim.actor === session?.user.id
     return {
       caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
+      itineraryText: row.opening?.[0]?.reports?.original_text ?? undefined,
       at: at ?? row.created_at, owner, ownedByMe, ...status,
     }
   }))

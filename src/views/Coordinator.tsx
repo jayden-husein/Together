@@ -93,6 +93,8 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
         <p>{c.incident}</p><div><StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} /></div>
       </header>
       <p className="lede">Notes stay with Coordinators. Emergency Contacts see only the outcome.</p>
+      {c.explanation && <p>Matched stop: {c.explanation}</p>}
+      {c.itineraryText && <blockquote aria-label="What the traveler pasted for their Itinerary">{c.itineraryText}</blockquote>}
       {/* Another Coordinator can take a Case over; claiming your own again would only repeat the entry. */}
       <EventForm legend="Owner" submitLabel={c.ownedByMe ? 'Unclaim' : c.owner ? 'Take over case' : 'Claim'} note="none" onSubmit={() => record({ action: c.ownedByMe ? 'released' : 'claimed' })}>
         <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
