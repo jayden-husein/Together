@@ -25,3 +25,13 @@ export function caseStatus(history: CaseHistoryEntry[]): CaseStatus {
   }
   return { status: latest?.status ?? 'unconfirmed' }
 }
+
+const queuePriority: CaseStatus['status'][] = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved']
+
+export function orderQueue<T extends { status: CaseStatus['status'] }>(cases: T[]) {
+  return [...cases].sort((a, b) => queuePriority.indexOf(a.status) - queuePriority.indexOf(b.status))
+}
+
+export function individualUpdateView(entry: { status: NonNullable<CaseHistoryEntry['status']>; at: string }) {
+  return { status: entry.status, at: entry.at }
+}
