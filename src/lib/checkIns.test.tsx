@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { expect, expectTypeOf, test, vi } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
-import { type ContactUpdate, type IndividualUpdate, useCaseHistory, useIndividualUpdates, useMyCheckIns, useQueue } from './checkIns'
+import { type ContactUpdate, type IndividualUpdate, useIncidents, useCaseHistory, useIndividualUpdates, useMyCheckIns, useQueue } from './checkIns'
 
 let status = 'safe'
 let queueFixture = false
@@ -10,6 +10,15 @@ vi.mock('./supabase', async () => {
   const client = createClient('https://example.test', 'test-key', { global: { fetch: async input => {
     const url = new URL(String(input))
     const path = url.pathname
+    if (path.endsWith('/incidents')) {
+      const offset = Number(url.searchParams.get('offset'))
+      const limit = Number(url.searchParams.get('limit') ?? 1000)
+      return Response.json(Array.from({ length: 101 }, (_, i) => ({
+        id: 'incident-' + i, name: 'Flood ' + i, created_at: '2026-10-31T06:00:00Z',
+        starts_at: '2026-10-31T05:00:00Z', ends_at: null,
+        area: { type: 'Polygon', coordinates: [] },
+      })).slice(offset, offset + limit))
+    }
     if (path.endsWith('/rpc/is_coordinator')) return Response.json(true)
     if (path.endsWith('/coordinators')) return Response.json([{ account_id: 'acct-dana', name: 'Dana Ortiz' }])
     if (queueFixture && path.endsWith('/cases')) {
@@ -138,5 +147,14 @@ test('a Case history merges Reports and Case events, newest first, saying who di
     expect(attempt).toMatchObject({ reached: false, text: 'Voicemail', at: '2026-10-31T06:10:00Z' })
     expect(proposed).toMatchObject({ urgency: 'urgent', fromReport: 'r1' })
     expect(checkIn).toMatchObject({ id: 'r1', status: 'needs_assistance', text: 'Water rising' })
+  } finally { hook.unmount() }
+})
+
+
+test('the public Incident selector receives every page of verified Incidents', async () => {
+  const hook = renderHook(() => useIncidents())
+  try {
+    await waitFor(() => expect(hook.result.current.data).toHaveLength(101))
+    expect(hook.result.current.data?.at(-1)?.id).toBe('incident-100')
   } finally { hook.unmount() }
 })

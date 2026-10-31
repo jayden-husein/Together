@@ -36,6 +36,8 @@ if (pending) {
   for (const result of await Promise.all([1, 2].map(() => coordinator.functions.invoke('potential-incident', { body })))) {
     if (result.error) throw result.error
   }
+  const { data: verified } = await server.from('incidents').select('id').eq('id', pending.id).throwOnError()
+  expect(verified.length === 1, 'verification creates exactly one Incident')
   const { data: opened } = await server.from('cases').select('id, persons!inner(account_id), case_events!inner(source_report_id, action)')
     .eq('incident_id', pending.id).eq('case_events.action', 'opened')
     .returns<{ id: string; persons: { account_id: string }; case_events: { source_report_id: string }[] }[]>().throwOnError()

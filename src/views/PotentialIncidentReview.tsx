@@ -1,3 +1,4 @@
+import { VerificationSessionError, signInAgain } from '../lib/incidentVerification'
 import { useState, type FormEvent } from 'react'
 import { CircleMarker, MapContainer, Polygon, Tooltip } from 'react-leaflet'
 import type { LatLngTuple } from 'leaflet'
@@ -15,6 +16,7 @@ export default function PotentialIncidentReview({ draft, onVerify }: { draft: Po
   const [end, setEnd] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [sessionExpired, setSessionExpired] = useState(false)
   const [tileError, setTileError] = useState(false)
   const rings = draft.area.coordinates.map(ring => ring.map(([lng, lat]): LatLngTuple => [lat, lng]))
   async function verify(event: FormEvent) {
@@ -26,7 +28,10 @@ export default function PotentialIncidentReview({ draft, onVerify }: { draft: Po
     try {
       await verifyIncident(draft.id, start === localTime(draft.starts_at) ? draft.starts_at : new Date(start).toISOString(), end ? new Date(end).toISOString() : null)
       onVerify()
-    } catch { setError('Could not verify the Incident. Try again.') }
+    } catch (failure) {
+      setSessionExpired(failure instanceof VerificationSessionError)
+      setError(failure instanceof Error ? failure.message : 'Could not verify the Incident. Try again.')
+    }
     finally { setBusy(false) }
   }
   return <section className="panel potential-review" aria-label={draft.name}>
@@ -85,6 +90,7 @@ export default function PotentialIncidentReview({ draft, onVerify }: { draft: Po
         </div>
         <button className="button review-verify" disabled={busy}>{busy ? 'Verifying…' : 'Verify Incident'}</button>
         {error && <p role="alert">{error}</p>}
+        {sessionExpired && <button type="button" className="button" onClick={() => signInAgain().catch(() => setError('Could not sign out. Refresh the page and sign in again.'))}>Sign in again</button>}
       </fieldset>
     </form>
   </section>

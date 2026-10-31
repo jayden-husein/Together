@@ -278,14 +278,14 @@ async function pendingIncidents() {
     .order('starts_at').order('id').range(from, to).returns<PotentialIncident[]>().throwOnError())
 }
 export function usePendingIncidents() { return usePoll(pendingIncidents) }
-export async function verifyIncident(id: string, start: string, end: string | null) {
-  const { error } = await supabase.functions.invoke('potential-incident', { body: { action: 'verify', id, start, end } })
-  if (error) throw error
-}
+export { verifyIncident } from './incidentVerification'
 
-async function latestIncident() {
-  const { data } = await supabase.from('incidents').select('id,name,created_at')
-    .order('created_at', { ascending: false }).limit(1).throwOnError()
-  return data
+export type PublicIncident = {
+  id: string; name: string; created_at: string; starts_at: string; ends_at: string | null
+  area: { type: 'Polygon'; coordinates: number[][][] }
 }
-export function useLatestIncident() { return usePoll(latestIncident) }
+async function publicIncidents() {
+  return readPages((from, to) => supabase.from('incidents').select('id,name,created_at,starts_at,ends_at,area')
+    .order('created_at', { ascending: false }).order('id').range(from, to).returns<PublicIncident[]>().throwOnError())
+}
+export function useIncidents() { return usePoll(publicIncidents) }

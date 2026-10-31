@@ -193,3 +193,15 @@
   .review-sources { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .review-times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.incident-browser { grid-template-rows: auto auto minmax(var(--map-min-height), 1fr) auto; }
+.incident-picker { min-inline-size: 0; align-content: start; }
+.incident-option { display: grid; gap: var(--space-1); inline-size: 100%; text-align: start; padding: var(--space-3); background: var(--color-surface); color: var(--color-text); border: var(--border-width) solid var(--color-card-edge); border-radius: var(--radius-md); cursor: pointer; font: inherit; overflow-wrap: anywhere; }
+.incident-option span { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.incident-option[aria-pressed="true"] { background: var(--color-brand-bg); border-color: var(--color-brand-fg); }
+.incident-browser .incident-map { min-inline-size: 0; }
+@container (min-width: 56rem) {
+  .incident-browser { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); grid-template-rows: auto minmax(var(--map-min-height), 1fr) auto; }
+  .incident-browser > .view-header { grid-column: 1 / -1; }
+  .incident-window { grid-column: 2; }
+}
