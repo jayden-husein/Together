@@ -11,7 +11,7 @@ export default function PublicIncident() {
   return (
     <div className="incident">
       <header className="view-header">
-        <h1>Grand Canyon incident</h1>
+        <h1>Flash flood at Phantom Ranch</h1>
         <SourceLine source="Verified by a Coordinator" at="2026-10-31T13:40:00Z" />
       </header>
       <div className="incident-map">

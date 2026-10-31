@@ -19,7 +19,7 @@ export default function Coordinator() {
     <div className="coordinator">
       <header className="view-header">
         <h1>Cases</h1>
-        <p className="lede">Grand Canyon incident</p>
+        <p className="lede">Flash flood at Phantom Ranch</p>
         <ul className="summary" aria-label="Cases by status">
           {STATUSES.map(s => (
             <li key={s}>

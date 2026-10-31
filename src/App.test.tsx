@@ -11,7 +11,7 @@ test.each([
   ['#/traveler', 'Your Check-in'],
   ['#/contact', 'Travelers who named you'],
   ['#/coordinator', 'Cases'],
-  ['', 'Grand Canyon incident'],
+  ['', 'Flash flood at Phantom Ranch'],
 ])('route %s shows its view with the Simulation label', (hash, heading) => {
   window.location.hash = hash
   render(<App />)

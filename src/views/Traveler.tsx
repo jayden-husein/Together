@@ -8,7 +8,7 @@ export default function Traveler() {
       </header>
       <section className="panel panel-request" aria-labelledby="request-heading">
         <h2 id="request-heading">Check-in Request</h2>
-        <p>Coordinators for the Grand Canyon incident are asking whether you're safe. Choose one.</p>
+        <p>Coordinators for the flash flood at Phantom Ranch are asking whether you're safe. Choose one.</p>
         {/* #7 stores the Check-in as a Report. */}
         <CheckInButtons onCheckIn={() => {}} />
       </section>
