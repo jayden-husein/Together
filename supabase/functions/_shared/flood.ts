@@ -16,46 +16,63 @@ export function floodReadings(now = Date.now()) {
   } satisfies Record<string, Reading>
 }
 
-// The feed accepts only the fixture readings; their time is whatever the delivery says, if it isn't in the future.
-export function fixtureReading(packet: unknown): Reading | null {
-  if (!packet || typeof packet !== 'object') return null
-  const { kind, name, text, at, area } = packet as Record<string, unknown>
+type Packet = { readings: Reading[]; area: Polygon }
+type EarlierDraft = { id: string; sources: Pick<Reading, 'name' | 'text' | 'at'>[]; dismissed_at: string | null; incident_id: string | null }
+
+const same = (a: Pick<Reading, 'name' | 'text' | 'at'>, b: Pick<Reading, 'name' | 'text' | 'at'>) =>
+  a.name === b.name && a.text === b.text && Date.parse(a.at) === Date.parse(b.at)
+
+// A fixture reading, at whatever time the delivery says if it isn't in the future.
+function fixtureReading(value: unknown): Reading | null {
+  if (!value || typeof value !== 'object') return null
+  const { kind, name, text, at, area } = value as Record<string, unknown>
   const known = Object.values(floodReadings()).find(r => r.kind === kind && r.name === name && r.text === text)
   if (!known || typeof at !== 'string' || !(Date.parse(at) <= Date.now())) return null
   if (JSON.stringify(area) !== JSON.stringify('area' in known ? known.area : undefined)) return null
   return { ...known, at: new Date(at).toISOString() }
 }
 
-type EarlierDraft = { id: string; sources: Pick<Reading, 'name' | 'text' | 'at'>[]; dismissedAt: string | null }
-
-// Reading assessment. Any reading with a new time or value raises a new Potential incident, carrying the latest
-// dismissal of one from the same source; Corroborated needs two or more source kinds.
-export function assessReadings(readings: Reading[], earlier: EarlierDraft[]) {
-  const seen = (r: Reading) => earlier.some(e => e.sources.some(s => s.name === r.name && s.text === r.text && Date.parse(s.at) === Date.parse(r.at)))
-  if (readings.every(seen)) return { raise: false } as const
-  const names = new Set(readings.map(r => r.name))
-  const dismissal = earlier.filter(e => e.dismissedAt && e.sources.some(s => names.has(s.name)))
-    .sort((a, b) => Date.parse(b.dismissedAt!) - Date.parse(a.dismissedAt!))[0]
-  return { raise: true, earlierDismissal: dismissal?.id ?? null, corroborated: new Set(readings.map(r => r.kind)).size >= 2 } as const
+// The feed accepts only fixture readings, and needs one with its own geometry: the warning's area, else the gauge's.
+export function fixturePacket(value: unknown): Packet | null {
+  if (!Array.isArray(value) || value.length > Object.keys(floodReadings()).length) return null
+  const readings = value.map(fixtureReading)
+  if (!readings.every((r): r is Reading => r !== null)) return null
+  const area = (readings.find(r => r.kind === 'warning') ?? readings.find(r => r.area))?.area
+  return area ? { readings, area } : null
 }
 
-export async function draftFlood(readings: Reading[], summarize: () => Promise<unknown>) {
+// Reading assessment. Any reading with a new time or value raises a new Potential incident. It carries the latest
+// decision on the same sources if that was a dismissal, and is Corroborated by two or more source kinds not dismissed.
+export function assessReadings(readings: Reading[], earlier: EarlierDraft[]) {
+  if (readings.every(r => earlier.some(e => e.sources.some(s => same(s, r))))) return { raise: false } as const
+  const dismissed = (r: Reading) => earlier.some(e => e.dismissed_at && e.sources.some(s => same(s, r)))
+  const names = new Set(readings.map(r => r.name))
+  const latest = (e: EarlierDraft) => Math.max(...e.sources.map(s => Date.parse(s.at)))
+  const decided = earlier.filter(e => (e.dismissed_at || e.incident_id) && e.sources.some(s => names.has(s.name)))
+    .sort((a, b) => latest(b) - latest(a))[0]
+  return { raise: true, earlierDismissal: decided?.dismissed_at ? decided.id : null,
+    corroborated: new Set(readings.filter(r => !dismissed(r)).map(r => r.kind)).size >= 2 } as const
+}
+
+// The Potential incident to raise, or null for a duplicate delivery. The area is the source's, never the model's.
+export async function draftFlood({ readings, area }: Packet, earlier: EarlierDraft[], summarize: () => Promise<unknown>) {
+  const assessment = assessReadings(readings, earlier)
+  if (!assessment.raise) return null
   const sources = readings.map(({ kind, name, text, at }) => ({ kind, name, text, at, quote: text }))
-  // The warning's own geometry, else the gauge's; never the model's.
-  const area = (readings.find(r => r.kind === 'warning') ?? readings.find(r => r.area))?.area
-  if (!area) throw new Error('No source geometry')
+  const draft = { area, corroborated: assessment.corroborated, earlier_dismissal_id: assessment.earlierDismissal,
+    starts_at: readings.map(r => r.at).sort()[0], readings_key: readings.map(r => `${r.name}|${r.text}|${r.at}`).sort().join('\n') }
   try {
     const output = await summarize()
     if (!output || typeof output !== 'object' || !('summary' in output) || typeof output.summary !== 'string'
       || !output.summary.trim() || !('quotes' in output) || !Array.isArray(output.quotes)
       || output.quotes.length !== sources.length) throw new Error('Incomplete summary')
     const quotes = output.quotes
-    return { summary: output.summary.trim(), area, fallback: false, sources: sources.map((source, i) => {
+    return { ...draft, summary: output.summary.trim(), fallback: false, sources: sources.map((source, i) => {
       const quote = quotes[i]
       if (typeof quote !== 'string' || !quote.trim() || !source.text.includes(quote)) throw new Error('Unattributed quote')
       return { ...source, quote }
     }) }
   } catch {
-    return { summary: sources.map(s => `${s.name}: ${s.text}`).join(' '), area, sources, fallback: true }
+    return { ...draft, summary: sources.map(s => `${s.name}: ${s.text}`).join(' '), sources, fallback: true }
   }
 }

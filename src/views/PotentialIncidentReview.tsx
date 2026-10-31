@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { MapContainer, Polygon } from 'react-leaflet'
 import type { LatLngTuple } from 'leaflet'
 import MapTiles from '../MapTiles'
-import { dismissPotentialIncident, verifyIncident, type PotentialIncident } from '../lib/checkIns'
+import { dismissPotentialIncident, verifyIncident, type Dismissal, type PotentialIncident } from '../lib/checkIns'
 import { SourceLine, formatTime } from '../ui'
 
 function localTime(iso: string) {
@@ -18,34 +18,31 @@ export default function PotentialIncidentReview({ draft, onDecided }: { draft: P
   const [reason, setReason] = useState('')
   const [tileError, setTileError] = useState(false)
   const rings = draft.area.coordinates.map(ring => ring.map(([lng, lat]): LatLngTuple => [lat, lng]))
-  async function verify(event: FormEvent) {
-    event.preventDefault()
+  async function decide(action: () => Promise<void>, failure: string) {
     if (busy) return
-    if (end && new Date(end) <= new Date(start)) { setError('End time must follow the start time.'); return }
     setBusy(true)
     setError('')
     try {
-      await verifyIncident(draft.id, start === localTime(draft.starts_at) ? draft.starts_at : new Date(start).toISOString(), end ? new Date(end).toISOString() : null)
+      await action()
       onDecided()
-    } catch { setError('Could not verify the Incident. Try again.') }
+    } catch { setError(failure) }
     finally { setBusy(false) }
   }
-  async function dismiss(event: FormEvent) {
+  function verify(event: FormEvent) {
     event.preventDefault()
-    if (busy || !reason.trim()) return
-    setBusy(true)
-    setError('')
-    try {
-      await dismissPotentialIncident(draft.id, reason.trim())
-      onDecided()
-    } catch { setError('Could not dismiss the Potential incident. Try again.') }
-    finally { setBusy(false) }
+    if (end && new Date(end) <= new Date(start)) { setError('End time must follow the start time.'); return }
+    decide(() => verifyIncident(draft.id, start === localTime(draft.starts_at) ? draft.starts_at : new Date(start).toISOString(),
+      end ? new Date(end).toISOString() : null), 'Could not verify the Incident. Try again.')
+  }
+  function dismiss(event: FormEvent) {
+    event.preventDefault()
+    if (reason.trim()) decide(() => dismissPotentialIncident(draft.id, reason.trim()), 'Could not dismiss the Potential incident. Try again.')
   }
   return <section className="panel potential-review">
     <h2>Potential incident</h2>
     {draft.earlier && <div role="note">
-      <p>An earlier Potential incident from the same source was dismissed: <q>{draft.earlier.dismissal_reason}</q></p>
-      <SourceLine source={draft.earlier.dismisser?.name ?? 'A Coordinator'} at={draft.earlier.dismissed_at} />
+      <p>An earlier Potential incident from the same source was dismissed.</p>
+      <DismissalLine dismissal={draft.earlier} />
     </div>}
     <h3>{draft.name}</h3>
     <p><strong>{draft.corroborated ? 'Corroborated' : 'Single source'}</strong></p>
@@ -73,4 +70,11 @@ export default function PotentialIncidentReview({ draft, onDecided }: { draft: P
     </fieldset></form>
     {error && <p role="alert">{error}</p>}
   </section>
+}
+
+export function DismissalLine({ dismissal }: { dismissal: Dismissal }) {
+  return <>
+    <p><q>{dismissal.dismissal_reason}</q></p>
+    <SourceLine source={`Dismissed by ${dismissal.dismisser?.name ?? 'a Coordinator'}`} at={dismissal.dismissed_at} />
+  </>
 }

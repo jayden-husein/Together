@@ -11,6 +11,7 @@ const submitCheckIn = vi.hoisted(() => vi.fn(async () => {}))
 const markRead = vi.hoisted(() => vi.fn(async () => {}))
 vi.mock('../lib/checkIns', () => ({
   usePendingIncidents: () => ({ data: [], error: null }),
+  useDismissedIncidents: () => ({ data: [], error: null }),
   submitCheckIn,
   markIndividualUpdatesRead: markRead,
   useMyCheckIns: () => ({ data: data.myCheckIns, error: null }),
