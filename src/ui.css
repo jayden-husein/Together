@@ -1,0 +1,105 @@
+/* Shared components. Values come only from tokens.css. */
+
+/* Simulation: a test-pattern chip. The stripes are decoration; the word carries the meaning. */
+.simulation {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-text);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+}
+.simulation::before {
+  content: '';
+  inline-size: var(--space-4);
+  block-size: var(--space-4);
+  border-radius: var(--radius-sm);
+  background: repeating-linear-gradient(-45deg, var(--color-text) 0 var(--space-1), transparent 0 var(--space-2));
+}
+
+/* Status badges: pill, tinted fill. Urgency tags: square corners and an outline, so the two never read as one set. */
+.badge,
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+  border: var(--border-width) solid currentColor;
+}
+.tag { border-radius: var(--radius-sm); background: var(--color-surface); }
+
+/* One map from status to colors. Badges, rows and anything else tinted by a status read these three. */
+.status-unconfirmed { --status-bg: var(--color-neutral-bg); --status-fg: var(--color-neutral-fg); --status-border-style: dashed; }
+.status-cant_reach { --status-bg: var(--color-warning-bg); --status-fg: var(--color-warning-fg); }
+.status-needs_assistance { --status-bg: var(--color-danger-bg); --status-fg: var(--color-danger-fg); }
+.status-safe { --status-bg: var(--color-success-bg); --status-fg: var(--color-success-fg); }
+.status-resolved { --status-bg: var(--color-info-bg); --status-fg: var(--color-info-fg); }
+.badge { border-radius: var(--radius-pill); background: var(--status-bg); color: var(--status-fg); border-style: var(--status-border-style, solid); }
+
+.tag-immediate { background: var(--color-danger-bg); color: var(--color-danger-fg); }
+.tag-urgent { color: var(--color-warning-fg); }
+.tag-can_wait { color: var(--color-neutral-fg); }
+.tag-untriaged { color: var(--color-neutral-fg); border-style: dashed; }
+
+/* Check-in buttons: stacked and full width on a phone, side by side once there's room. */
+.check-in {
+  display: grid;
+  gap: var(--space-3);
+}
+@container (min-width: 28rem) {
+  .check-in { grid-template-columns: 1fr 1fr; }
+}
+.check-in-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-on-solid);
+  font: inherit;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: scale 150ms ease-out;
+}
+.check-in-button:not(:disabled):active { scale: 0.96; }
+.check-in-safe { background: var(--color-success-solid); }
+.check-in-needs-assistance { background: var(--color-danger-solid); }
+@media (prefers-reduced-motion: reduce) {
+  .check-in-button { transition: none; }
+  .check-in-button:not(:disabled):active { scale: none; }
+}
+
+/* Inline icons: drawn with currentColor so they take the text color of whatever holds them. */
+.icon {
+  inline-size: var(--icon-size);
+  block-size: var(--icon-size);
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.source-line {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+.source-line time { font-variant-numeric: tabular-nums; white-space: nowrap; }
