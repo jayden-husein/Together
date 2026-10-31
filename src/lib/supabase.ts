@@ -1,8 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-if (!url || !key) throw new Error('Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (see .env.example)')
+export const accountAccessConfigured = Boolean(url && key)
+let client: SupabaseClient | undefined
 
-// Publishable key only: safe in the browser, row-level security does the access control (ADR-0001).
-export const supabase = createClient(url, key)
+// The public Incident page also runs without an account backend.
+export function getSupabase() {
+  if (!accountAccessConfigured) throw new Error('Account access has not been configured.')
+  return client ??= createClient(url, key)
+}
