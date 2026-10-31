@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import type { LatLngTuple } from 'leaflet'
 import { MapContainer, TileLayer } from 'react-leaflet'
 
-const GRAND_CANYON: [number, number] = [36.1, -112.1]
+const GRAND_CANYON: LatLngTuple = [36.1, -112.1]
 
 export default function App() {
   const [tilesFailed, setTilesFailed] = useState(false)
