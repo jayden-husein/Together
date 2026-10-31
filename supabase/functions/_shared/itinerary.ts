@@ -14,7 +14,7 @@ export type Place = keyof typeof places
 
 export type Stop = { place: Place; start: string; end: string }
 
-export function confirmedStops(input: unknown): Stop[] {
+export function confirmedStops(input: unknown, now = Date.now()): Stop[] {
   if (!Array.isArray(input) || !input.length || input.length > maxStops) throw new Error(`Choose 1 to ${maxStops} stops.`)
   return input.map(row => {
     if (!row || typeof row.place !== 'string' || !Object.hasOwn(places, row.place)) throw new Error('Choose a listed place.')
@@ -30,6 +30,7 @@ export function confirmedStops(input: unknown): Stop[] {
         throw new Error('Choose a valid calendar date.')
       }
     }
+    if (Date.parse(start) < now) throw new Error('Arrival must be at the current time or later.')
     if (Date.parse(start) >= Date.parse(end)) throw new Error('Departure must follow arrival.')
     return { place, start: new Date(start).toISOString(), end: new Date(end).toISOString() }
   })
