@@ -29,3 +29,10 @@ test('the Individual Update contains only status and time even when the Report c
   const report = { status: 'needs_assistance', at: '2026-10-31T06:00:00Z', original_text: 'Private', note: 'Private note' } as const
   expect(individualUpdateView(report)).toEqual({ status: 'needs_assistance', at: report.at })
 })
+
+test('two Reports in the same millisecond retain database timestamp order', () => {
+  const earlier = { status: 'safe', at: '2026-10-31T06:00:00.1231Z', outcome: null } as const
+  const later = { status: 'needs_assistance', at: '2026-10-31T06:00:00.123900Z', outcome: null } as const
+  expect(caseStatus([later, earlier])).toEqual({ status: 'needs_assistance' })
+  expect(caseStatus([earlier, later])).toEqual({ status: 'needs_assistance' })
+})

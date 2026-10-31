@@ -7,7 +7,7 @@ export type CheckInStatus = 'safe' | 'needs_assistance'
 export type CheckInReport = { id: string; status: CheckInStatus; description: string | null; at: string }
 export type CheckInRequest = { caseId: string; incident: string; reports: CheckInReport[] }
 export type QueueCase = { caseId: string; traveler: string; incident: string } & CaseStatus
-export type ContactUpdate = {
+export type IndividualUpdate = {
   caseId: string
   traveler: string
   update: { status: Exclude<CaseStatus['status'], 'unconfirmed'>; at: string }
@@ -90,11 +90,18 @@ type QueueRow = {
 async function queue(): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
-  const { data } = await supabase.from('cases').select(
-    'id, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome)',
-  ).in('reports.kind', ['check_in', 'cant_reach']).eq('case_events.action', 'resolved')
-    .order('created_at').returns<QueueRow[]>().throwOnError()
-  return orderQueue(data.map(row => {
+  const rows: QueueRow[] = []
+  const pageSize = 100
+  for (let offset = 0; ; offset += pageSize) {
+    const { data } = await supabase.from('cases').select(
+      'id, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome)',
+    ).in('reports.kind', ['check_in', 'cant_reach']).eq('case_events.action', 'resolved')
+      .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
+      .order('created_at').order('id').range(offset, offset + pageSize - 1).returns<QueueRow[]>().throwOnError()
+    rows.push(...data)
+    if (data.length < pageSize) break
+  }
+  return orderQueue(rows.map(row => {
     const history: CaseHistoryEntry[] = row.reports.map(report => ({
       at: report.created_at, outcome: null,
       status: report.kind === 'cant_reach' ? 'cant_reach' : report.body.status ?? null,
@@ -104,7 +111,7 @@ async function queue(): Promise<QueueCase[]> {
   }))
 }
 
-async function individualUpdates(): Promise<ContactUpdate[]> {
+async function individualUpdates(): Promise<IndividualUpdate[]> {
   const { data } = await supabase.rpc('contact_case_updates')
     .select('case_id, person_name, status, at')
     .in('entry_kind', ['check_in', 'cant_reach', 'resolved']).not('status', 'is', null)
