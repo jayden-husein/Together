@@ -1,14 +1,15 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
-import type { CaseHistoryItem, CheckInRequest, IndividualUpdate, QueueCase } from '../lib/checkIns'
+import type { CaseHistoryItem, CheckInRequest, ContactCase, IndividualUpdate, QueueCase } from '../lib/checkIns'
 import Coordinator from './Coordinator'
 import EmergencyContact from './EmergencyContact'
 import Traveler from './Traveler'
 
-const data = vi.hoisted(() => ({ myCheckIns: [] as CheckInRequest[], queue: [] as QueueCase[], updates: [] as IndividualUpdate[], history: [] as CaseHistoryItem[] }))
+const data = vi.hoisted(() => ({ myCheckIns: [] as CheckInRequest[], queue: [] as QueueCase[], updates: [] as IndividualUpdate[], contactCases: [] as ContactCase[], history: [] as CaseHistoryItem[] }))
 const recordCaseEvent = vi.hoisted(() => vi.fn(async () => {}))
 const submitCheckIn = vi.hoisted(() => vi.fn(async () => {}))
 const markRead = vi.hoisted(() => vi.fn(async () => {}))
+const fileCantReach = vi.hoisted(() => vi.fn(async () => {}))
 vi.mock('../lib/checkIns', () => ({
   usePendingIncidents: () => ({ data: [], error: null }),
   submitCheckIn,
@@ -18,12 +19,15 @@ vi.mock('../lib/checkIns', () => ({
   useQueue: () => ({ data: data.queue, error: null, reload: () => {} }),
   useCaseHistory: () => ({ data: data.history, error: null, reload: () => {} }),
   useIndividualUpdates: () => ({ data: data.updates, error: null }),
+  useContactCases: () => ({ data: data.contactCases, error: null, reload: () => {} }),
+  fileCantReach,
 }))
 
 afterEach(() => {
   cleanup()
   submitCheckIn.mockClear()
   markRead.mockClear()
+  fileCantReach.mockClear()
   recordCaseEvent.mockClear()
 })
 
@@ -220,4 +224,24 @@ test('the Emergency Contact sees a resolution with its outcome', () => {
   data.updates = [{ caseId: 'c1', traveler: 'Maya Chen', update: { status: 'resolved', outcome: 'not_in_area', at: '2026-10-31T14:40:00Z' }, unreadNotificationId: null }]
   render(<EmergencyContact />)
   expect(within(screen.getByRole('list', { name: 'Individual Updates' })).getByText('Resolved: Not in area')).toBeTruthy()
+})
+
+test("the Emergency Contact files a Can't-reach report from the traveler's Case", async () => {
+  data.contactCases = [
+    { caseId: 'c1', traveler: 'Maya Chen', incident: 'Flash flood at Phantom Ranch', status: 'unconfirmed' },
+    { caseId: 'c2', traveler: 'Maya Chen', incident: 'Earlier flood', status: 'resolved', outcome: 'reached' },
+  ]
+  render(<EmergencyContact />)
+  const cases = within(screen.getByRole('list', { name: 'Cases' })).getAllByRole('listitem')
+  // A resolved Case has nothing left to report.
+  expect(within(cases[1]).queryByRole('button')).toBeNull()
+  fireEvent.click(within(cases[0]).getByRole('button', { name: "I can't reach Maya Chen" }))
+  await waitFor(() => expect(fileCantReach).toHaveBeenCalledWith('c1'))
+})
+
+test('the Emergency Contact view sends anyone else to 911 or local law enforcement, with no form for them', () => {
+  data.contactCases = []
+  render(<EmergencyContact />)
+  expect(screen.getByText(/contact 911 or local law enforcement/)).toBeTruthy()
+  expect(screen.queryByRole('textbox')).toBeNull()
 })

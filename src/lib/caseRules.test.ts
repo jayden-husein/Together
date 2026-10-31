@@ -48,3 +48,10 @@ test('a resolved Individual Update carries its outcome', () => {
   expect(individualUpdateView({ status: 'resolved', at: '2026-11-01T14:00:00Z', outcome: 'assistance_provided' }))
     .toEqual({ status: 'resolved', at: '2026-11-01T14:00:00Z', outcome: 'assistance_provided' })
 })
+
+test("a Check-in after a Can't-reach report replaces Can't reach", () => {
+  const cantReach = { at: '2026-11-01T13:20:00Z', status: 'cant_reach', outcome: null } as const
+  const checkIn = { at: '2026-11-01T13:40:00Z', status: 'needs_assistance', outcome: null } as const
+  expect(caseStatus([cantReach])).toEqual({ status: 'cant_reach' })
+  expect(caseStatus([checkIn, cantReach])).toEqual({ status: 'needs_assistance' })
+})
