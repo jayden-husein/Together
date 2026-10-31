@@ -7,7 +7,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "reset-demo": "node --env-file=.env scripts/reset-demo.ts",
+    "access-check": "node --env-file=.env scripts/access-check.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
