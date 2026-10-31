@@ -46,6 +46,8 @@ I would use Claude if I had API tokens, but Dartmouth Chat is free for me.
 | Potential incident | Summarizes the source readings (the gauge, weather warning and news snippet) into a Potential incident, quoting each source. The incident area always comes from the source's own geometry, never from the model. | A **Coordinator** verifies or dismisses it. It affects nobody until verified. |
 | Urgency triage | Proposes Immediate, Urgent or Can wait for a Needs assistance Check-in, quoting the traveler's words. Anything it can't assess becomes Untriaged, which sorts to the top of the queue. | The **Coordinator** can change the Urgency, and their change always wins. |
 
+The Coordinator can also ask for an optional AI draft of a General Update, which they edit before posting; without it they write one by hand.
+
 Matching stops to an Incident, deciding who can see what, and choosing who gets Notifications are done by plain code and database rules, not by the AI.
 
 ## Limitations and assumptions
@@ -122,6 +124,8 @@ You need git and Node.js 22.22+ or 24.15+ (the test runner needs these versions)
 
    Open the URL it prints (usually <http://localhost:5173>).
 
+4. To reset the demo or sign in as a demo Account, ask a teammate for the shared password and set `DEMO_PASSWORD=` in `.env`.
+
 Other commands: `npm test` runs the tests, `npm run typecheck` runs the type checker, and `npm run build` makes a production build.
 
 `.env` holds secrets and is ignored by git. Never put the Supabase secret key or the Dartmouth Chat API key in a `VITE_` variable, because Vite copies those into the browser bundle.
@@ -162,9 +166,9 @@ These are the actual results of the run-through on fixed demo data. Each check r
 
 | # | Check | Result | Notes |
 | --- | --- | --- | --- |
-| 1 | Maya pastes her plans; the AI proposes stops; she confirms them | | |
+| 1 | After the reset, Maya pastes new plans; the AI proposes stops; she confirms them | | |
 | 2 | A stop missing a date is marked for clarification, with the original text kept | | |
-| 3 | The first gauge reading raises a Potential incident; the Coordinator dismisses it | | |
+| 3 | The first gauge reading raised a Potential incident that the reset dismissed as the Coordinator ("gauge sensor fault"); the Coordinator view shows that dismissal | | |
 | 4 | The second gauge reading and the weather warning raise a new, Corroborated Potential incident that shows the earlier dismissal | | |
 | 5 | The Coordinator verifies it; a Case opens for Maya, explained by her Phantom Ranch stop and its time window | | |
 | 6 | A traveler at the same place on a different day gets no Case | | |
@@ -191,9 +195,9 @@ These are the actual results of the run-through on fixed demo data. Each check r
 
    Use `production` instead of `staging` for the live demo; that needs the `PRODUCTION_*` values in `.env` (see `.env.example`).
 
-2. Sign in as the Coordinator. The first gauge reading is already dismissed ("gauge sensor fault"), and a new Corroborated Potential incident from the second reading and the weather warning is waiting. Verify it to open the Cases and send the Check-in Requests.
-3. Sign in as Maya (another window) and check in. Sign in as Sam to see the Individual Updates.
-4. Run the access check. On staging, `--verify` verifies the pending Potential incident for you and also checks that two verifications at once open no duplicate Cases:
+2. Sign in as the Coordinator. The first gauge reading is already dismissed ("gauge sensor fault"), and a new Corroborated Potential incident from the second gauge reading, the weather warning and the news snippet is waiting. Verify it to open the Cases and send the Check-in Requests.
+3. Sign in as Maya (another window) and check in. Sign in as Sam, Maya's Emergency Contact, to see the Individual Updates.
+4. Run the access check. On staging you can skip step 2: run this straight after the reset, and `--verify` verifies the pending Potential incident for you, checking that two verifications at once open no duplicate Cases. If nothing is pending, it skips that part:
 
    ```bash
    npm run access-check -- staging --verify
