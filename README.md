@@ -43,9 +43,9 @@ Matching stops to an Incident, deciding who can see what, and choosing who gets 
 - **A fixed place list, not geocoding.** Itinerary stops must be one of a short list of known Grand Canyon places.
 - **Made-up sources, not live feeds.** The gauge readings and weather warning are fixed demo data.
 - **Pre-linked Emergency Contacts, not invites.** The demo seed links Maya to her Emergency Contact. There is no flow for inviting a contact or for the contact to accept.
-- **Demo Accounts only, no self sign-up.** The demo uses only the demo Accounts that `npm run reset-demo` creates.
+- **Demo Accounts only.** The product would let people sign up themselves. The demo leaves that out and uses only the demo Accounts that `npm run reset-demo` creates.
 - **In-app Notifications only.** There is no SMS, email or push delivery. Someone sees a Notification only when they open the app.
-- **Consent-only records.** In this build a Person comes only from sign-up or the demo seed. Venue records shared with consent are the only other way in, and they're planned ([ADR-0002](docs/adr/0002-no-third-party-missing-person-reports.md)). Family members can't report someone who isn't already in Together; they're directed to law enforcement.
+- **Consent-only records.** In the product a Person comes only from an Account's sign-up or from a Venue record shared with consent, which is planned ([ADR-0002](docs/adr/0002-no-third-party-missing-person-reports.md)). In this demo every Person comes from the demo seed. Family members can't report someone who isn't already in Together; they're directed to law enforcement.
 - **Planned location is not presence.** A confirmed stop that overlaps an Incident opens a Case saying the person's whereabouts are unconfirmed. It doesn't claim they were there.
 - **Synthetic checks only.** Our tests and the run-through use made-up data. They don't show how Together would perform in a real disaster, and we haven't measured accuracy, adoption or impact.
 
