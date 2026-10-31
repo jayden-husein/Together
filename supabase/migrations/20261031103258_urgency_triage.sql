@@ -13,8 +13,8 @@ begin
   select * into strict checked from public.reports
     where id = p_report_id and kind = 'check_in' and body ->> 'status' = 'needs_assistance';
   select * into strict target from public.cases where id = checked.case_id for update;
-  -- One proposal per Check-in, however often the function is called.
-  if exists (select 1 from public.case_events where source_report_id = checked.id and action = 'urgency_proposed') then
+  -- One Urgency proposal per Check-in, however often the function is called; an Untriaged one can be retried.
+  if exists (select 1 from public.case_events where source_report_id = checked.id and action = 'urgency_proposed' and urgency is not null) then
     return;
   end if;
   insert into public.case_events(case_id, action, actor, source_report_id, urgency, note, demo, created_at)

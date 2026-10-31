@@ -33,7 +33,7 @@ export function proposedUrgency(text: string, reply: unknown): { urgency: Urgenc
 }
 
 // A quote must be whole words of the pasted text, ignoring case and runs of whitespace,
-// with at least three letters or digits so it shows where the stop came from.
+// with at least three letters or digits so it shows where the stop or Urgency came from.
 function quoted(text: string, quote: unknown): quote is string {
   if (typeof quote !== 'string' || (quote.match(/[\p{L}\p{N}]/gu)?.length ?? 0) < 3) return false
   const normalize = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()

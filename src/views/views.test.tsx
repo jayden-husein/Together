@@ -423,9 +423,9 @@ test('a Coordinator changes the Urgency', async () => {
   data.queue = [{ ...mayaCase, urgency: 'untriaged', urgencyQuote: null, urgencyChanged: false }]
   data.history = []
   const detail = openMayaCase()
-  fireEvent.click(detail.getByText('Change urgency', { selector: 'summary' }))
+  fireEvent.click(detail.getByText('Change Urgency', { selector: 'summary' }))
   fireEvent.click(detail.getByLabelText('Urgent'))
-  fireEvent.click(detail.getByRole('button', { name: 'Change urgency' }))
+  fireEvent.click(detail.getByRole('button', { name: 'Change Urgency' }))
   await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'urgency_changed', urgency: 'urgent', note: undefined }))
 })
 

@@ -92,8 +92,11 @@ function Triage({ c }: { c: QueueCase }) {
   if (!c.urgency) return null
   return (
     <>
-      {c.urgencyQuote && <blockquote aria-label="The traveler's words behind the AI's proposed Urgency">{c.urgencyQuote}</blockquote>}
-      {c.urgencyChanged ? <p>Urgency set by a Coordinator.</p> : c.urgency === 'untriaged' ? <p>The AI couldn't assess this request yet.</p> : <p>Urgency proposed by the AI.</p>}
+      {c.urgencyChanged ? <p>Urgency set by a Coordinator.</p> : c.urgency === 'untriaged' ? <p>Untriaged: no Urgency from the AI. Set one.</p> : <p>Urgency proposed by the AI.</p>}
+      {c.urgencyQuote && <>
+        <p>{c.urgencyChanged ? "The AI's own proposal quoted:" : 'From the traveler\'s words:'}</p>
+        <blockquote aria-label="The traveler's words behind the AI's proposed Urgency">{c.urgencyQuote}</blockquote>
+      </>}
     </>
   )
 }
@@ -129,8 +132,8 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
         <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
       </EventForm>
       {c.status === 'needs_assistance' && (
-        <details className="case-tools"><summary>Change urgency</summary>
-        <EventForm legend="Urgency" submitLabel="Change urgency" note="optional" choices={URGENCIES}
+        <details className="case-tools"><summary>Change Urgency</summary>
+        <EventForm legend="Urgency" submitLabel="Change Urgency" note="optional" choices={URGENCIES}
           onSubmit={(urgency, { note }) => record({ action: 'urgency_changed', urgency: urgency as Urgency, note })} />
         </details>
       )}
