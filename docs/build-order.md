@@ -36,7 +36,7 @@ These need someone's own accounts, so an agent can't do them. They're slotted in
 
 1. Go to [vercel.com/new](https://vercel.com/new) → **Continue with GitHub**. When asked to install the Vercel app, choose **Only select repositories** → `jayden-husein/Together`.
 2. **Import** `Together`. Framework preset **Vite** (build `npm run build`, output `dist`).
-3. Name the project `together`.
+3. Name the project `together-fdys` (already done; Production is <https://together-fdys.vercel.app>).
 4. Under **Environment Variables**, add these for **Production only**:
    - `VITE_SUPABASE_URL` = `https://ojxqgqgmtwaehtdfaxrs.supabase.co`
    - `VITE_SUPABASE_PUBLISHABLE_KEY` = the production publishable key (Supabase → production project → Project Settings → API Keys; it starts with `sb_publishable_`).
@@ -48,7 +48,7 @@ Never put the secret key or the Claude API key in Vercel; those are Supabase Edg
 
 Every PR gets its own preview URL, posted as a comment on the PR. Previews must use **staging**, or unfinished PRs change the production demo data.
 
-1. Vercel → `together` → **Settings → Environment Variables**. Add the same two names again with only **Preview** ticked, using `STAGING_SUPABASE_URL` and `STAGING_SUPABASE_PUBLISHABLE_KEY` from your `.env`.
+1. Vercel → `together-fdys` → **Settings → Environment Variables**. Add the same two names again with only **Preview** ticked, using `STAGING_SUPABASE_URL` and `STAGING_SUPABASE_PUBLISHABLE_KEY` from your `.env`.
 2. **Settings → Deployment Protection**: turn **Vercel Authentication** off for previews. On the free plan, teammates can't be added to your Vercel account, so otherwise they hit a login wall. Previews only show synthetic staging data.
 3. Push any commit to redeploy; variable changes only apply to new deploys.
 4. Check: open a PR's preview, sign in as a demo Account, change something, and confirm it appears in the **staging** dashboard, not in production.
