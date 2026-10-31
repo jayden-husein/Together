@@ -171,3 +171,9 @@ These are the actual results of the run-through on fixed demo data. Each check r
 | 16 | The public page shows the Incident, Resources and General Updates without login and with no private details about anyone | | |
 | 17 | Two browser sessions see each other's changes within a few seconds | | |
 | 18 | Reset restores the demo story without touching other rows | | |
+
+### Run the flood verification demo
+
+Deploy the `potential-incident` and `confirm-itinerary` Edge Functions after applying migrations. Configure the server-side `ANTHROPIC_API_KEY` secret for Claude summaries. `ANTHROPIC_MODEL` optionally selects the model. A missing key, timeout or invalid quote produces a labeled pre-written summary.
+
+Run `npm run reset-demo -- staging`, then open the Coordinator view to review the three readings and warning polygon. Verify the time window to open Cases and send Check-in Requests. To exercise concurrent verification and the access checks against a freshly reset staging demo, run `npm run access-check -- staging --verify`. Reset again to restore the pending review.

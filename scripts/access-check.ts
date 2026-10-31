@@ -17,6 +17,38 @@ async function rows(client: SupabaseClient, table: string) {
 }
 
 const anon = createClient(url, publishableKey, { auth: { persistSession: false } })
+const coordinator = await signIn(accounts.coordinator)
+const { data: pending } = await coordinator.from('potential_incidents').select('id, starts_at')
+  .eq('demo', true).is('incident_id', null).maybeSingle().throwOnError()
+if (pending) {
+  if (process.argv[2] !== 'staging' || !process.argv.includes('--verify')) {
+    throw new Error('Verify the pending demo Incident in the Coordinator view first, or use staging --verify.')
+  }
+  const server = serverClient()
+  const { data: before } = await server.from('cases').select('id').eq('incident_id', pending.id).throwOnError()
+  expect(before.length === 0, 'pending Potential incident has no Cases')
+  const { data: notices } = await coordinator.from('notifications').select('id').eq('kind', 'potential_incident')
+    .eq('refers_to', pending.id).throwOnError()
+  expect(notices.length === 1, 'Coordinator received the Potential incident Notification')
+  const body = { action: 'verify', id: pending.id, start: pending.starts_at, end: null }
+  const traveler = await signIn(accounts.maya)
+  expect((await traveler.functions.invoke('potential-incident', { body })).error !== null, 'Traveler cannot verify')
+  for (const result of await Promise.all([1, 2].map(() => coordinator.functions.invoke('potential-incident', { body })))) {
+    if (result.error) throw result.error
+  }
+  const { data: opened } = await server.from('cases').select('id, persons!inner(account_id), case_events!inner(source_report_id, action)')
+    .eq('incident_id', pending.id).eq('case_events.action', 'opened')
+    .returns<{ id: string; persons: { account_id: string }; case_events: { source_report_id: string }[] }[]>().throwOnError()
+  const { data: requests } = await server.from('notifications').select('account_id, refers_to')
+    .eq('kind', 'check_in_request').in('refers_to', opened.map(c => c.id)).throwOnError()
+  const { data: { users } } = await server.auth.admin.listUsers({ perPage: 1000 })
+  const expected = new Set(users.filter(u => u.email === accounts.maya ||
+    /^traveler-(1|4|7|10|13|16|19)@demo\.together\.example\.com$/.test(u.email ?? '')).map(u => u.id))
+  expect(opened.length === 8 && opened.every(c => expected.delete(c.persons.account_id)) && !expected.size,
+    'two verifications open Cases for exactly the eight overlapping demo travelers')
+  expect(requests.length === opened.length && opened.every(c => requests.some(n => n.refers_to === c.id && n.account_id === c.persons.account_id)),
+    'each matched traveler receives one Check-in Request')
+}
 expect((await rows(anon, 'incidents')).length > 0, 'without logging in: reads Incidents')
 for (const table of privateTables) expect((await rows(anon, table)).length === 0, `without logging in: reads no ${table}`)
 
@@ -40,12 +72,11 @@ expect(
 const maya = await signIn(accounts.maya)
 expect((await rows(maya, 'persons')).length === 1, 'Maya: reads her own Person')
 expect((await rows(maya, 'cases')).length === 1, 'Maya: reads her own Case')
-const coordinator = await signIn(accounts.coordinator)
 expect((await rows(coordinator, 'cases')).length > 0, 'Coordinator: reads Cases')
 
 // Even the server key can't rewrite history or duplicate a Case.
 const server = serverClient()
-const [mayaCase] = await rows(server, 'cases')
+const [mayaCase] = await rows(maya, 'cases')
 for (const table of ['reports', 'case_events']) {
   expect((await server.from(table).update({ demo: true }).eq('demo', true)).error !== null, `server key: cannot update ${table}`)
   expect((await server.from(table).delete().eq('demo', true)).error !== null, `server key: cannot delete ${table}`)

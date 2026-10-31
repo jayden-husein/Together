@@ -1,5 +1,6 @@
+import PotentialIncidentReview from './PotentialIncidentReview'
 import { type FormEvent, type ReactNode, useId, useState } from 'react'
-import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, useCaseHistory, useQueue } from '../lib/checkIns'
+import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
 import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, UrgencyTag, formatTime, statusClass } from '../ui'
 
 // Queue order, so the summary reads the same way as the list below it.
@@ -12,6 +13,7 @@ const SOURCE: Record<CaseStatus, string> = {
 
 export default function Coordinator() {
   const { data, error, reload } = useQueue()
+  const pending = usePendingIncidents()
   const [selected, setSelected] = useState<string>()
   const cases = data ?? []
   const open = cases.find(c => c.caseId === selected)
@@ -28,6 +30,8 @@ export default function Coordinator() {
           ))}
         </ul>
       </header>
+      {pending.error && <p role="alert">{pending.error}</p>}
+      {pending.data?.map(draft => <PotentialIncidentReview key={draft.id} draft={draft} onVerify={() => { pending.reload(); reload() }} />)}
       {error && <p role="alert">{error}</p>}
       {!data ? (
         !error && <p className="empty">Loading…</p>

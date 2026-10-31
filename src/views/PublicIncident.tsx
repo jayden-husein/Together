@@ -1,3 +1,4 @@
+import { useLatestIncident } from '../lib/checkIns'
 import { useState } from 'react'
 import type { LatLngTuple } from 'leaflet'
 import { MapContainer } from 'react-leaflet'
@@ -9,11 +10,15 @@ const GRAND_CANYON: LatLngTuple = [36.1, -112.1]
 export default function PublicIncident() {
   const [tilesFailed, setTilesFailed] = useState(false)
 
+  const { data, error } = useLatestIncident()
+  const incident = data?.[0]
   return (
     <div className="incident">
       <header className="view-header">
-        <h1>Flash flood at Phantom Ranch</h1>
-        <SourceLine source="Verified by a Coordinator" at="2026-10-31T13:40:00Z" />
+        <h1>{incident?.name ?? 'Incident'}</h1>
+        {incident && <SourceLine source="Verified by a Coordinator" at={incident.created_at} />}
+        {error && <p role="alert">Could not load the Incident.</p>}
+        {data && !incident && <p>No verified Incident yet.</p>}
       </header>
       <div className="incident-map">
         {tilesFailed && (
