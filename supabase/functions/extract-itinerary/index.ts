@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0'
 import { proposedStops } from '../_shared/aiOutputCheck.ts'
 import { headers, reply, signedInUser } from '../_shared/http.ts'
@@ -37,17 +37,18 @@ Deno.serve(async request => {
     const text = typeof body?.text === 'string' ? body.text.trim() : ''
     if (!text || text.length > maxTextLength) return reply(400, { message: `Paste 1 to ${maxTextLength} characters.` })
     const today = localDateTime(Date.now()).slice(0, 10)
-    const claude = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY'), timeout: 20_000, maxRetries: 0 })
-    const response = await claude.messages.create({
-      model: 'claude-sonnet-5-5',
-      max_tokens: 4000,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema } },
-      system,
-      messages: [{ role: 'user', content: `Today is ${today}.\n<plans>\n${text.replace(/<\s*\/?\s*plans\b[^>]*>/gi, '')}\n</plans>` }],
+    const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY'), timeout: 20_000, maxRetries: 0 })
+    const response = await openai.responses.create({
+      model: 'gpt-6-luna',
+      max_output_tokens: 4000,
+      reasoning: { effort: 'low' },
+      text: { format: { type: 'json_schema', name: 'itinerary', schema, strict: true } },
+      instructions: system,
+      input: `Today is ${today}.\n<plans>\n${text.replace(/<\s*\/?\s*plans\b[^>]*>/gi, '')}\n</plans>`,
     })
-    const output = response.content.find((block): block is Anthropic.TextBlock => block.type === 'text')
-    if (response.stop_reason !== 'end_turn' || !output) throw new Error(`stop reason ${response.stop_reason}`)
-    return reply(200, { stops: proposedStops(text, JSON.parse(output.text)) })
+    // An incomplete reply or a refusal has no usable JSON.
+    if (response.status !== 'completed' || !response.output_text) throw new Error(`status ${response.status}`)
+    return reply(200, { stops: proposedStops(text, JSON.parse(response.output_text)) })
   } catch (error) {
     console.error('Extract itinerary failed', error instanceof Error ? error.message : 'unknown error')
     return reply(502, { message: 'Could not read your plans.' })

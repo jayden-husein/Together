@@ -1,1 +1,1 @@
-{ "imports": { "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@0.135.0" } }
+{ "imports": { "openai": "npm:openai@7.35.0" } }

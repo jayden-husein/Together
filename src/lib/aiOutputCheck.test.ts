@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { proposedStops } from '../../supabase/functions/_shared/aiOutputCheck'
 
-// Recorded model replies; no live Claude calls.
+// Recorded model replies; no live model calls.
 const demo = 'On November 1, 2026 I will be at the visitor center 7 to 8, then Phantom Ranch 1 to 4.'
 const demoReply = { stops: [
   { quote: 'visitor center 7 to 8', place: 'Grand Canyon Visitor Center', date: '2026-11-01', start: '07:00', end: '08:00' },

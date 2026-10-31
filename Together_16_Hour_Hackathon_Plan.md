@@ -278,5 +278,5 @@ These support the event context and the technical capabilities used in this prop
 - [Leaflet quick start](https://leafletjs.com/examples/quick-start/): map markers, polygons, popups, and attribution.
 - [Supabase row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security): database access controls.
 - [Turf point-in-polygon](https://turfjs.org/docs/api/booleanPointInPolygon): geographic inclusion checks.
-- [Claude structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs): schema-constrained AI response formatting.
+- [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs): schema-constrained AI response formatting.
 - [MDN geolocation watchPosition](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/watchPosition): foreground location integration and permission requirements.
