@@ -30,6 +30,7 @@ export default function PublicIncident() {
         {!data && !error && <p>{copy.loading_incidents}</p>}
         {data && !incident && <p>{data.length ? copy.no_active_incidents_show_resolved_incidents_to : copy.no_verified_incident_yet}</p>}
       </header>
+      <div className="incident-content">
       <section className="panel incident-picker" aria-label={copy.choose_an_incident}>
         <h2>{copy.incidents}</h2>
         <p className="lede">{copy.choose_an_incident_to_see_its_area}</p>
@@ -56,6 +57,7 @@ export default function PublicIncident() {
       </section>}
       {incident && <GeneralUpdates incidentId={incident.id} />}
       {incident && <ResourceList />}
+      </div>
       {incident && management.data?.[0] && <IncidentManagement key={'management-' + incident.id} incident={incident}
         cases={management.data[0].cases.filter(c => c.incidentId === incident.id)}
         onChange={() => { reload(); management.reload() }} />}

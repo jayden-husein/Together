@@ -65,3 +65,9 @@ The reproducible checks live in `scripts/qa/`. They read demo credentials from e
 Fresh production browser contexts passed all 16 role/route combinations and all 112 viewport checks, with zero horizontal overflow and zero serious axe findings. The production workflow then exposed a stale local report control when an older open report was superseded by a Safe check-in. The follow-up regression test failed before the synchronization fix and passes afterward; the full staging browser scenario also passes with an open report preloaded. Final production scenario and QA retraction results are recorded on the follow-up PR.
 
 The production MCP security advisor flags intentionally exposed, authorization-checked SECURITY DEFINER RPCs and the existing disabled leaked-password-protection setting. These are distinct from the staging CLI advisor's no-warning result; do not read the staging result as a clean production Auth configuration audit.
+
+## Incident scrolling follow-up
+
+The requested late fix has a real scrolling regression script at `scripts/qa/map-overlap.mjs`. Before the fix, a 1440px viewport at scroll position 1760 had 64,872 square pixels of overlap between the sticky map and the full-width Case summary. A browser-only static-position probe removed the overlap, confirming the sticky boundary as the cause. The fix preserves the sticky map inside a bounded public-content grid, with Case controls outside that boundary. The scroll regression passes at 1440, 1280, 1024, 912, 768, 390 and 360px; build and all 184 tests pass.
+
+When verification is pending, the Coordinator Case detail/“Select a case” panel now scrolls normally as explicitly requested. The browser regression failed before the change (414px movement for a 600px page scroll), then passed with a read-only pending-verification fixture. This does not change the Incident map: that remains sticky inside its bounded public-content section.
