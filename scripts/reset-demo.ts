@@ -5,9 +5,9 @@ import { confirmedStops } from '../supabase/functions/_shared/itinerary.ts'
 import { accounts, serverClient, password, signIn, url, publishableKey } from './demo.ts'
 
 const db = serverClient()
-const check = <T>({ data, error }: { data: T; error: unknown }) => {
+const check = <R extends { data: unknown; error: unknown }>({ data, error }: R) => {
   if (error) throw error
-  return data
+  return data as NonNullable<R['data']>
 }
 
 // Check that confirmation is deployed before clearing the previous demo.
