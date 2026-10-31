@@ -96,3 +96,10 @@ test("a Check-in after a Can't-reach report replaces Can't reach", () => {
   expect(caseStatus([cantReach])).toEqual({ status: 'cant_reach' })
   expect(caseStatus([checkIn, cantReach])).toEqual({ status: 'needs_assistance' })
 })
+
+test('a reached coordinator attempt is a dated Safe event, and a newer report wins', () => {
+ const reached={status:'safe',outcome:null,at:'2026-10-31T14:00:00Z'} as const
+ const report={status:'cant_reach',outcome:null,at:'2026-10-31T14:01:00Z'} as const
+ expect(caseStatus([reached,report])).toEqual({status:'cant_reach'})
+ expect(caseStatus([report,{...reached,at:'2026-10-31T14:02:00Z'}])).toEqual({status:'safe'})
+})

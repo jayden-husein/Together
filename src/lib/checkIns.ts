@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { caseStatus, caseUrgency, compareTimes, individualUpdateView, orderQueue, statusConflict, type CaseHistoryEntry, type CaseStatus, type Outcome, type Urgency, type UrgencyEntry } from './caseRules'
 import { inForce, withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
+import { match } from '../../supabase/functions/_shared/match'
+import { places } from '../../supabase/functions/_shared/itinerary'
 import { nearestResourceFor, type Resource } from '../../supabase/functions/_shared/resources'
 import { actionEvent } from './analytics'
 import { supabase } from './supabase'
@@ -9,7 +11,7 @@ import { supabase } from './supabase'
 export type CheckInStatus = 'safe' | 'needs_assistance'
 export type CheckInReport = { id: string; status: CheckInStatus; description: string | null; at: string }
 // `nearestResource`: the Resource nearest the traveler's stop in the Incident, else nearest the Incident's area.
-export type CheckInRequest = { caseId: string; incident: string; nearestResource: Resource; reports: CheckInReport[]; requestedAt?: string }
+export type CheckInRequest = { caseId: string; incident: string; nearestResource: Resource; resourceDistanceKm?:number; reports: CheckInReport[]; requestedAt?: string }
 // `at`: when the status was set (the latest Report or resolution), else when the Case opened.
 // `owner`: the Coordinator with the latest claim, if any; `ownedByMe`: that claim is the signed-in Account's.
 // `itineraryText`: what the traveler pasted for the Itinerary that opened the Case, if anything.
@@ -65,7 +67,12 @@ async function myCheckIns(): Promise<CheckInRequest[]> {
     const { data } = await supabase.from('cases').select('id, incidents!inner(id, name, starts_at, ends_at, area)').in('id', batch).is('incidents.resolved_at', null)
       .returns<{ id: string; incidents: PublicIncident }[]>().throwOnError()
     for (const { id, incidents: incident } of data) {
-      cases.set(id, { caseId: id, incident: incident.name, nearestResource: nearestResourceFor(incident, stops), reports: [], requestedAt: requests.filter(n => n.refers_to === id).at(-1)?.created_at })
+      const resource=nearestResourceFor(incident,stops)
+      const stop=match('traveler',stops,[incident])[0]?.stop
+      const ring=incident.area.coordinates[0].slice(1)
+      const point=stop?places[stop.place]:[ring.reduce((v,p)=>v+p[0],0)/ring.length,ring.reduce((v,p)=>v+p[1],0)/ring.length]
+      const km=Math.hypot((resource.at[0]-point[0])*111.32*Math.cos(point[1]*Math.PI/180),(resource.at[1]-point[1])*110.57)
+      cases.set(id, { caseId: id, incident: incident.name, nearestResource: resource, resourceDistanceKm:km, reports: [], requestedAt: requests.filter(n => n.refers_to === id).at(-1)?.created_at })
     }
     const reports = await readPages((from, to) => supabase.from('reports')
       .select('case_id, id, created_at, original_text, body').in('case_id', batch).eq('kind', 'check_in')
@@ -280,7 +287,7 @@ async function individualUpdates(): Promise<IndividualUpdate[]> {
   const unreadIds = new Map(unread.map(n => [`${n.refers_to} ${n.created_at}`, n.id]))
   return data.reverse().map(entry => ({
     caseId: entry.case_id, traveler: entry.person_name, update: entry.status || entry.urgency ? individualUpdateView(entry) : { status: 'unconfirmed' as const, at: entry.at },
-    cause: entry.entry_kind === 'contact_attempt' ? entry.source === 'coordinator_not_reached' ? `Coordinators tried to reach ${entry.person_name} and couldn’t. They are still trying.` : `A coordinator reached ${entry.person_name}` : entry.entry_kind === 'cant_reach' ? `An Emergency Contact reported they can’t reach ${entry.person_name}` : entry.entry_kind === 'check_in' ? `${entry.person_name} checked in ${entry.status === 'safe' ? 'Safe' : 'Needs assistance'}` : 'A coordinator updated this case',
+    cause: entry.entry_kind === 'contact_attempt' ? entry.source === 'coordinator_not_reached' ? `Coordinators tried to reach ${entry.person_name} and couldn’t. They are still trying.` : `A coordinator reached ${entry.person_name}` : entry.entry_kind === 'cant_reach' ? entry.source === 'you' ? `You reported you can’t reach ${entry.person_name}` : `An Emergency Contact reported they can’t reach ${entry.person_name}` : entry.entry_kind === 'check_in' ? `${entry.person_name} checked in ${entry.status === 'safe' ? 'Safe' : 'Needs assistance'}` : 'A coordinator updated this case',
     unreadNotificationId: unreadIds.get(`${entry.case_id} ${entry.at}`) ?? null,
   }))
 }

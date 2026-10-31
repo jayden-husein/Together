@@ -1,3 +1,4 @@
+import { copy } from '../copy'
 import { toast } from '../components'
 import { useDraft } from '../lib/drafts'
 import { useEffect, useState } from 'react'
@@ -33,11 +34,14 @@ export default function Itinerary({ correcting, onCancel, onConfirmed, onAlready
   // Inputs show Grand Canyon time. Round up to the next selectable minute.
   const earliest = localDateTime(Math.ceil(now / 60_000) * 60_000)
   const latest = '9999-12-31T23:59'
+  const [savedStops,setSavedStops]=useDraft(`itinerary-stops:${correcting?.id ?? 'new'}`)
   const [stops, setStops] = useState<Draft[]>(() => {
+    if(savedStops) {try {const restored=JSON.parse(savedStops);if(Array.isArray(restored)&&restored.length<=maxStops&&restored.every(s=>s&&typeof s.key==='string'&&typeof s.place==='string'&&(!s.place||Object.hasOwn(places,s.place))&&typeof s.start==='string'&&typeof s.end==='string'))return restored}catch{/* Ignore invalid local data. */}}
     const locked = lockedStops(correcting?.stops ?? [])
     return (correcting?.stops ?? []).map(s => ({ key: crypto.randomUUID(), place: s.place,
       start: localDateTime(Date.parse(s.start)), end: localDateTime(Date.parse(s.end)), locked: locked.includes(s) ? s : undefined }))
   })
+  useEffect(()=>setSavedStops(stops.length?JSON.stringify(stops):''),[stops,setSavedStops])
   const [id, setId] = useState(() => crypto.randomUUID())
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -76,48 +80,49 @@ export default function Itinerary({ correcting, onCancel, onConfirmed, onAlready
       }
       edit([])
       setText('')
-      setMessage('Itinerary confirmed.'); toast('Itinerary confirmed')
+      setMessage('Itinerary confirmed.'); toast(copy.itinerary_confirmed)
       onConfirmed?.()
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not confirm your Itinerary.') }
     finally { setSaving(false) }
   }
   return <section className="panel">
-    <h2>Your itinerary</h2><ol className="stepper" aria-label="Itinerary steps"><li>1 Paste plans</li><li>2 Review stops</li><li>3 Confirm</li></ol><p className="lede">Fill in stops, review places and times, then confirm your itinerary to share it with Coordinators.</p>
-    {correcting && <p role="status">Correcting your Itinerary from <time dateTime={correcting.at}>{formatTime(correcting.at)}</time>. <button className="button" type="button" onClick={onCancel}>Discard correction</button></p>}
+    <h2>{copy.your_itinerary}</h2><ol className="stepper" aria-label={copy.itinerary_steps}><li>{copy["1_paste_plans"]}</li><li>{copy["2_review_stops"]}</li><li>{copy["3_confirm"]}</li></ol><p className="lede">{copy.fill_in_stops_review_places_and_times}</p>
+    {correcting && <p role="status">{copy.correcting_your_itinerary_from}<time dateTime={correcting.at}>{formatTime(correcting.at)}</time>{copy.text_7}<button className="button" type="button" onClick={onCancel}>{copy.discard_correction}</button></p>}
     <form className="itinerary" onSubmit={e => { e.preventDefault(); void extract() }}>
-      <label>Paste your plans<textarea required maxLength={maxTextLength} rows={3} value={text} disabled={reading || saving}
-        placeholder="November 1, 2026: visitor center 7 to 8, then Phantom Ranch 1 to 4" onChange={e => setText(e.target.value)} /></label>
-      <div><button className="button" type="submit" disabled={reading || saving}>{reading ? 'Reading your plans…' : readFailed ? 'Try again' : 'Fill in stops'}</button></div>
-      {readFailed && <p role="alert">Could not read your plans. Try again, or add your stops yourself below.</p>}
+      <label>{copy.paste_your_plans}<textarea required maxLength={maxTextLength} rows={3} value={text} disabled={reading || saving}
+        placeholder={copy.november_1_2026_visitor_center_7_to} onChange={e => setText(e.target.value)} /></label>
+      <div><button className="button" type="submit" disabled={reading || saving}>{reading ? copy.reading_your_plans : readFailed ? copy.try_again : copy.fill_in_stops}</button></div>
+      {readFailed && <p role="alert">{copy.could_not_read_your_plans_try_again}</p>}
     </form>
     <form className="itinerary" onSubmit={e => { e.preventDefault(); void confirm() }}>
-      {stops.length > 0 && <p>Enter arrival and departure in Grand Canyon local time (MST).</p>}
+      {stops.length > 0 && <p>{copy.enter_arrival_and_departure_in_grand_canyon}</p>}
       {stops.map((stop, i) => {
         const change = (field: keyof Stop, value: string) => edit(stops.map(s => s.key === stop.key ? { ...s, [field]: field === 'place' ? value : value.replace(/^(\d{4})\d+(?=-)/, '$1') } : s))
         return <fieldset key={stop.key} disabled={saving || !!stop.locked}>
-          <legend>Stop {i + 1}{stop.locked && ', started, kept as it was'}</legend>
-          {stop.quote && <p>From your plans: “{stop.quote}”</p>}
-          {stop.needs?.includes('place') && !stop.place && <p role="status">Choose which place you meant.</p>}
-          {stop.needs?.includes('date') && !stop.start && <p role="status">Your plans don't say which day. Add the date.</p>}
-          {stop.times && !stop.start && <label>Date<input type="date" min={earliest.slice(0, 10)}
+          <legend>{copy.stop}{i + 1}{stop.locked && copy.started_kept_as_it_was}</legend>
+          {stop.quote && <p>{copy.from_your_plans}{stop.quote}{copy.text_9}</p>}
+          {stop.needs?.includes('place') && !stop.place && <p role="status">{copy.choose_which_place_you_meant}</p>}
+          {stop.needs?.includes('date') && !stop.start && <p role="status">{copy.your_plans_dont_say_which_day_add}</p>}
+          {stop.times && !stop.start && <label>{copy.date}<input type="date" min={earliest.slice(0, 10)}
             onChange={e => e.target.value && edit(stops.map(s => s.key === stop.key ? { ...s, start: `${e.target.value}T${stop.times!.start}`, end: `${e.target.value}T${stop.times!.end}` } : s))} /></label>}
-          {stop.needs?.includes('time') && !stop.start && <p role="status">Add the arrival and departure times.</p>}
-          <label>Place<select required value={stop.place} onChange={e => change('place', e.target.value)}>
-            <option value="">Choose a place</option>
+          {stop.needs?.includes('time') && !stop.start && <p role="status">{copy.add_the_arrival_and_departure_times}</p>}
+          <label>{copy.place}<select required value={stop.place} onChange={e => change('place', e.target.value)}>
+            <option value="">{copy.choose_a_place}</option>
             {Object.keys(places).map(p => <option key={p}>{p}</option>)}
           </select></label>
-          <label>Arrival · MST, Grand Canyon local<input type="datetime-local" required min={earliest} max={latest} value={stop.start} onChange={e => change('start', e.target.value)} /></label>
-          <label>Departure · MST, Grand Canyon local<input type="datetime-local" required min={stop.start > earliest ? stop.start : earliest} max={latest} value={stop.end} onChange={e => change('end', e.target.value)} /></label>
-          {!stop.place && <p className="field-error">Choose a place for this stop.</p>}
-          {stop.start && stop.end && stop.end <= stop.start && <p className="field-error" role="alert">Departure must be after arrival.</p>}
-          {stop.start && stop.end && stops.some((other,j) => j !== i && other.start < stop.end && other.end > stop.start) && <p className="field-error" role="alert">This stop overlaps another stop. Adjust its times.</p>}
-          {stop.start && stop.end > stop.start && <span className="tag">{Math.round((Date.parse(stop.end)-Date.parse(stop.start))/60000)} min</span>}
-          <button className="button" type="button" onClick={() => edit(stops.filter(s => s.key !== stop.key))}>Remove stop</button>
+          <label>{copy.arrival_mst_grand_canyon_local}<input type="datetime-local" required min={earliest} max={latest} value={stop.start} onChange={e => change('start', e.target.value)} /></label>
+          <label>{copy.departure_mst_grand_canyon_local}<input type="datetime-local" required min={stop.start > earliest ? stop.start : earliest} max={latest} value={stop.end} onChange={e => change('end', e.target.value)} /></label>
+          {!stop.place && <p className="field-error">{copy.choose_a_place_for_this_stop}</p>}
+          {stop.start && stop.end && stop.end <= stop.start && <p className="field-error" role="alert">{copy.departure_must_be_after_arrival}</p>}
+          {stop.start && stop.end && stops.some((other,j) => j !== i && other.start < stop.end && other.end > stop.start) && <p className="field-error" role="alert">{copy.this_stop_overlaps_another_stop_adjust_its}</p>}
+          {stop.start && stop.end > stop.start && <span className="tag">{Math.round((Date.parse(stop.end)-Date.parse(stop.start))/60000)}{copy.min}</span>}
+          <button className="button" type="button" onClick={() => edit(stops.filter(s => s.key !== stop.key))}>{copy.remove_stop}</button>
         </fieldset>
       })}
+      {stops.some(s=>s.place)&&<ol className="stop-strip" aria-label={copy.itinerary_timeline}>{stops.filter(s=>s.place).map(s=><li key={s.key}><strong>{s.place}</strong><span>{s.start?s.start.slice(11):'Arrival needed'}{copy.text_12}{s.end?s.end.slice(11):'Departure needed'}{copy.mst}</span></li>)}</ol>}
       <StopsMap stops={stops} />
-      <div><button className="button" type="button" disabled={saving || stops.length >= maxStops} onClick={() => edit([...stops, blank()])}>Add stop</button>
-        {(stops.length > 0 || correcting) && <button className="button" disabled={saving} type="submit">Confirm itinerary</button>}</div>
+      <div><button className="button" type="button" disabled={saving || stops.length >= maxStops} onClick={() => edit([...stops, blank()])}>{copy.add_stop}</button>
+        {(stops.length > 0 || correcting) && <button className="button" disabled={saving} type="submit">{copy.confirm_itinerary}</button>}</div>
     </form>
     {message && <p role="status">{message}</p>}
   </section>

@@ -6,7 +6,7 @@ const browser=await chromium.launch()
 const pages={}
 try{
 for(const role of ['maya','sam','coordinator']){
- const context=await browser.newContext({viewport:{width:1440,height:1000}})
+ const context=await browser.newContext({viewport:{width:1440,height:1000},colorScheme:'dark'})
  const page=await context.newPage();page.on('dialog',d=>d.accept());pages[role]=page
  await page.goto(base+'#/signin');await page.getByLabel('Email',{exact:true}).fill(`${role}@demo.together.example.com`);await page.getByLabel('Password',{exact:true}).fill(process.env.DEMO_PASSWORD);await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL(role==='sam'?'**/#/contact':role==='maya'?'**/#/traveler':'**/#/coordinator',{timeout:20000})
 }
@@ -39,7 +39,7 @@ console.log('PASS attempt reaches contact without private note')
 await coordinator.getByRole('button',{name:'Post update',exact:true}).click()
 await coordinator.getByLabel(/General Update for/).fill('Simulation: shelter open. Please check with staff for availability.')
 await coordinator.getByRole('button',{name:'Preview update'}).click()
-await coordinator.getByRole('dialog').filter({hasText:'Post publicly?'}).waitFor()
+await coordinator.getByRole('dialog',{name:'Post publicly?',exact:true}).waitFor()
 await coordinator.getByRole('button',{name:'Post publicly',exact:true}).click()
 await maya.getByText('Simulation: shelter open. Please check with staff for availability.',{exact:true}).first().waitFor({timeout:15000})
 await sam.getByText('Simulation: shelter open. Please check with staff for availability.',{exact:true}).first().waitFor({timeout:15000})

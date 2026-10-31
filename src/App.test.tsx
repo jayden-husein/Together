@@ -143,3 +143,11 @@ test('public visitors see no Coordinator controls or Case statistics', () => {
   render(<App />)
   expect(screen.queryByRole('region', { name: 'Coordinator Incident controls' })).toBeNull()
 })
+
+test('unknown routes have a friendly 404 and retain the public sign-in control', async () => {
+ window.location.hash='#/does-not-exist'
+ render(<App />)
+ expect(await screen.findByRole('heading',{name:"We can't find that page"})).toBeTruthy()
+ expect(screen.getByRole('link',{name:'Go to Incident page'}).getAttribute('href')).toBe('#/')
+ expect(screen.getByRole('link',{name:'Sign in'})).toBeTruthy()
+})

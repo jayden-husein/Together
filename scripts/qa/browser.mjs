@@ -8,8 +8,8 @@ await mkdir(out+'/screenshots',{recursive:true})
 const browser=await chromium.launch({headless:true})
 const results=[]
 try {
-for(const role of ['visitor','maya','sam','coordinator']){
- const context=await browser.newContext({viewport:{width:1440,height:1000}})
+for(const role of (process.env.QA_ROLES||'visitor,maya,sam,coordinator').split(',')){
+ const context=await browser.newContext({viewport:{width:1440,height:1000},colorScheme:'dark'})
  const page=await context.newPage()
  page.on('dialog',dialog=>dialog.accept())
  if(role!=='visitor'){
@@ -25,7 +25,7 @@ for(const role of ['visitor','maya','sam','coordinator']){
   if(role==='visitor'&&route)assert.match(await page.locator('h1').innerText(),/Welcome back/)
   if(role==='coordinator'&&['traveler','contact'].includes(route)){assert.match(await page.locator('h1').innerText(),/Coordinator accounts can't use this page/);assert.equal(await page.locator('main form').count(),0)}
   if(['maya','sam'].includes(role)&&route==='coordinator'){assert.match(await page.locator('h1').innerText(),/Coordinator access required/);assert.equal(await page.locator('main form').count(),0)}
-  await page.waitForTimeout(1000)
+  await page.waitForTimeout(2500)
   for(const width of [1440,1280,1024,912,768,390,360]){
    await page.setViewportSize({width,height:1000})
    await page.waitForTimeout(100)

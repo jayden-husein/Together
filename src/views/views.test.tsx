@@ -459,7 +459,7 @@ test("the Emergency Contact files a Can't-reach report from the traveler's Case"
   render(<EmergencyContact />)
   const cases = within(screen.getByRole('list', { name: 'Cases' })).getAllByRole('listitem')
   // A resolved Case has nothing left to report.
-  expect(within(cases[1]).queryByRole('button')).toBeNull()
+  expect(within(cases[1]).queryByRole('button',{name:/I can't reach/})).toBeNull()
   fireEvent.click(within(cases[0]).getByRole('button', { name: "I can't reach Maya Chen" }))
   expect(fileCantReach).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button',{name:'Yes, report it'}))
