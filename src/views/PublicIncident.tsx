@@ -1,14 +1,17 @@
-import { useIncidents, type PublicIncident as Incident } from '../lib/checkIns'
+import { useIncidents, useCoordinatorIncidentCases, resolveIncident, type QueueCase, type PublicIncident as Incident } from '../lib/checkIns'
 import { useState } from 'react'
 import type { LatLngTuple } from 'leaflet'
 import { MapContainer, Polygon } from 'react-leaflet'
 import MapTiles from '../MapTiles'
-import { SourceLine, formatTime } from '../ui'
+import { SourceLine, StatusBadge, formatTime } from '../ui'
 
 export default function PublicIncident() {
-  const { data, error } = useIncidents()
+  const { data, error, reload } = useIncidents()
+  const management = useCoordinatorIncidentCases()
+  const [showResolved, setShowResolved] = useState(false)
+  const visible = data?.filter(item => showResolved || !item.resolved_at)
   const [selected, setSelected] = useState<string>()
-  const incident = data?.find(item => item.id === selected) ?? data?.[0]
+  const incident = visible?.find(item => item.id === selected) ?? visible?.[0]
   return (
     <div className="incident incident-browser">
       <header className="view-header">
@@ -16,30 +19,36 @@ export default function PublicIncident() {
         {incident && <SourceLine source="Verified by a Coordinator" at={incident.created_at} />}
         {error && <p role="alert">Could not load Incidents. Try refreshing the page.</p>}
         {!data && !error && <p>Loading Incidents…</p>}
-        {data && !incident && <p>No verified Incident yet.</p>}
+        {data && !incident && <p>{data.length ? 'No active Incidents. Show resolved Incidents to view history.' : 'No verified Incident yet.'}</p>}
       </header>
       <section className="panel incident-picker" aria-label="Choose an Incident">
         <h2>Incidents</h2>
         <p className="lede">Choose an Incident to see its area and time window.</p>
+        <label><input type="checkbox" checked={showResolved} onChange={e => setShowResolved(e.target.checked)} /> Show resolved Incidents</label>
         <ul className="rows">
-          {data?.map(item => <li key={item.id}>
+          {visible?.map(item => <li key={item.id}>
             <button type="button" className="incident-option" aria-pressed={item.id === incident?.id} onClick={() => setSelected(item.id)}>
               <strong>{item.name}</strong>
               <span>{formatTime(item.starts_at)}</span>
-              <span>{item.ends_at ? 'Ended' : 'Ongoing'}</span>
+              <span>{item.resolved_at ? 'Resolved' : item.ends_at ? 'Time window set' : 'Ongoing'}</span>
             </button>
           </li>)}
         </ul>
       </section>
-      <IncidentMap key={incident?.id ?? 'empty'} incident={incident} />
+      <IncidentMap key={'map-' + (incident?.id ?? 'empty')} incident={incident} />
       {incident && <section className="panel incident-window" aria-label="Incident time window">
         <h2>Incident time window</h2>
+        {incident.resolved_at && <p>Resolved {formatTime(incident.resolved_at)}</p>}
         <dl className="review-facts">
           <div><dt>Start</dt><dd><time dateTime={incident.starts_at}>{formatTime(incident.starts_at)}</time></dd></div>
-          <div><dt>End</dt><dd>{incident.ends_at ? <time dateTime={incident.ends_at}>{formatTime(incident.ends_at)}</time> : 'Ongoing'}</dd></div>
+          <div><dt>End</dt><dd>{incident.ends_at ? <time dateTime={incident.ends_at}>{formatTime(incident.ends_at)}</time> : incident.resolved_at ? 'No end time recorded' : 'Ongoing'}</dd></div>
         </dl>
         <p className="lede">The shaded area is copied from the weather warning.</p>
       </section>}
+      {incident && management.data?.[0] && <IncidentManagement key={'management-' + incident.id} incident={incident}
+        cases={management.data[0].cases.filter(c => c.incidentId === incident.id)}
+        onChange={() => { reload(); management.reload() }} />}
+      {management.error && <p role="alert">Could not load Coordinator Case statistics. Try refreshing the page.</p>}
     </div>
   )
 }
@@ -55,5 +64,40 @@ function IncidentMap({ incident }: { incident?: Incident }) {
       <MapTiles onError={() => setTilesFailed(true)} />
       {rings && <Polygon positions={rings} pathOptions={{ color: 'var(--color-info-fg)', fillOpacity: 0.18 }} />}
     </MapContainer>
+  </section>
+}
+
+
+function IncidentManagement({ incident, cases, onChange }: { incident: Incident; cases: QueueCase[]; onChange: () => void }) {
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const statuses = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved'] as const
+  async function resolve() {
+    setBusy(true)
+    setError('')
+    try {
+      await resolveIncident(incident.id)
+      setConfirming(false)
+      onChange()
+    } catch { setError('Could not resolve the Incident. Try again.') }
+    finally { setBusy(false) }
+  }
+  return <section className="panel incident-management" aria-label="Coordinator Incident controls">
+    <h2>Cases for this Incident</h2>
+    <p>{cases.length} total · {cases.filter(c => c.status !== 'resolved').length} unresolved</p>
+    <ul className="summary" aria-label="Incident Case statistics">
+      {statuses.map(status => <li key={status}><span className="summary-count">{cases.filter(c => c.status === status).length}</span><StatusBadge status={status} /></li>)}
+    </ul>
+    <a href="#/coordinator">Open Case queue</a>
+    {!incident.resolved_at && (confirming ? <div className="incident-resolution">
+      <h3>Resolve {incident.name}?</h3>
+      <p>Stops new matching and moves this Incident and its Cases to history. {cases.filter(c => c.status !== 'resolved').length} Cases still have no resolution. Review them before continuing.</p>
+      <div className="row-main">
+        <button type="button" className="button" disabled={busy} onClick={resolve}>{busy ? 'Resolving…' : 'Confirm resolution'}</button>
+        <button type="button" className="link-button" disabled={busy} onClick={() => setConfirming(false)}>Cancel</button>
+      </div>
+    </div> : <button type="button" className="button" onClick={() => setConfirming(true)}>Resolve Incident</button>)}
+    {error && <p role="alert">{error}</p>}
   </section>
 }

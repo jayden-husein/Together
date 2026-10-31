@@ -205,3 +205,7 @@
   .incident-browser > .view-header { grid-column: 1 / -1; }
   .incident-window { grid-column: 2; }
 }
+
+.incident-management { grid-column: 1 / -1; }
+.incident-management > .button { justify-self: start; }
+.incident-resolution { display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-warning-bg); color: var(--color-warning-fg); }

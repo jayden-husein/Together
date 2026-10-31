@@ -13,7 +13,8 @@ const SOURCE: Record<CaseStatus, string> = {
 }
 
 export default function Coordinator() {
-  const { data, error, reload } = useQueue()
+  const [includeResolved, setIncludeResolved] = useState(false)
+  const { data, error, reload } = useQueue(includeResolved)
   const pending = usePendingIncidents()
   const dismissed = useDismissedIncidents()
   const [selected, setSelected] = useState<string>()
@@ -23,6 +24,7 @@ export default function Coordinator() {
     <div className="coordinator">
       <header className="view-header">
         <h1>Cases</h1>
+        <label><input type="checkbox" checked={includeResolved} onChange={e => setIncludeResolved(e.target.checked)} /> Include resolved Incidents</label>
         <ul className="summary" aria-label="Cases by status">
           {STATUSES.map(s => (
             <li key={s}>
@@ -56,8 +58,12 @@ export default function Coordinator() {
                 <StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} />
                 {c.urgency && <UrgencyTag urgency={c.urgency} />}
               </div>
+<<<<<<< Updated upstream
               <p className="lede">{c.incident}</p>
               <Triage c={c} />
+=======
+              <p className="lede">{c.incident}{c.incidentResolvedAt && <> — Incident resolved {formatTime(c.incidentResolvedAt)}</>}</p>
+>>>>>>> Stashed changes
               {c.explanation && <p>Matched stop: {c.explanation}</p>}
               <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
               <SourceLine source={SOURCE[c.status]} at={c.at} />

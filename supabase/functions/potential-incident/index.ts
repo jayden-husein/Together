@@ -66,6 +66,7 @@ Deno.serve(async request => {
     if (!coordinator) return reply(403, 'A Coordinator account is required.')
     const body = await request.json().catch(() => null)
     if (body?.action === 'ingest' && coordinator.demo) {
+<<<<<<< Updated upstream
       const packet = fixturePacket(body.readings)
       if (!packet) return reply(400, 'Unknown source packet.')
       // ponytail: reads every earlier Potential incident; filter by source name if the feed becomes real.
@@ -76,6 +77,28 @@ Deno.serve(async request => {
       const { data } = await db.from('potential_incidents').upsert({ ...draft, name: 'Flash flood at Phantom Ranch', demo: true },
         { onConflict: 'readings_key', ignoreDuplicates: true }).select('id').maybeSingle().throwOnError()
       return Response.json({ id: data?.id ?? null }, { headers })
+=======
+      // This feed accepts only the three synthetic fixture readings.
+      const readings = floodReadings()
+      const packet = body.readings
+      if (!packet || !(['gauge', 'warning', 'news'] as const).every(key =>
+        packet[key]?.name === readings[key].name && packet[key].text === readings[key].text) ||
+        packet.warning.area?.type !== 'Polygon' ||
+        JSON.stringify(packet.warning.area.coordinates) !== JSON.stringify(readings.warning.area.coordinates)) {
+        return reply(400, 'Unknown source packet.')
+      }
+      const prior = await db.from('potential_incidents').select('id').eq('source_key', 'demo-flood-v1').maybeSingle().throwOnError()
+      if (prior.data) return Response.json(prior.data, { headers })
+      const draft = await draftFlood(packet, () => summarize(packet))
+      const { data } = await db.from('potential_incidents').upsert({ ...draft, source_key: 'demo-flood-v1', name: 'Flash flood at Phantom Ranch',
+        starts_at: new Date(Date.now() - 30 * 60000).toISOString(), demo: true },
+        { onConflict: 'source_key', ignoreDuplicates: true }).select('id').maybeSingle().throwOnError()
+      if (!data) {
+        const existing = await db.from('potential_incidents').select('id').eq('source_key', 'demo-flood-v1').single().throwOnError()
+        return Response.json(existing.data, { headers })
+      }
+      return Response.json(data, { headers })
+>>>>>>> Stashed changes
     }
     if (body?.action !== 'verify' || typeof body.id !== 'string') return reply(400, 'Invalid review.')
     const { start, end } = body
