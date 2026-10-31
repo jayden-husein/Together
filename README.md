@@ -21,7 +21,7 @@ What works in the final build. Only list a feature here once it works end to end
 
 - **People**: Maya, her Emergency Contact, about 20 other travelers, and one unrelated Account used to test access. All of them are made up.
 - **Sources**: a stream gauge reading, a weather warning and a news snippet, written by hand. No live sensor, weather or news feed is connected.
-- **Incident**: a flash flood near the overlook, flagged as a simulation.
+- **Incident**: a flash flood near Phantom Ranch, flagged as a simulation.
 - **Resources**: shelters, water and first aid, made up, each showing a made-up source and last-updated time.
 - **Places**: the place list uses real Grand Canyon places and their real coordinates. Only the people and events are fictional.
 
