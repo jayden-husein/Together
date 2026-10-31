@@ -1,18 +1,24 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import App from './App'
 
+const management = vi.hoisted(() => ({ data: [] as { cases: import('./lib/checkIns').QueueCase[] }[] }))
+const resolve = vi.hoisted(() => vi.fn(async () => {}))
 const incident = vi.hoisted(() => ({ data: [] as import('./lib/checkIns').PublicIncident[] }))
 const updates = vi.hoisted(() => ({ data: [] as import('./lib/checkIns').GeneralUpdate[], error: null }))
 vi.mock('./lib/checkIns', async importOriginal => ({
   ...await importOriginal<typeof import('./lib/checkIns')>(),
-  useIncidents: () => incident,
+  useIncidents: () => ({ ...incident, reload: () => {} }),
   useGeneralUpdates: () => updates,
+  useCoordinatorIncidentCases: () => ({ ...management, error: null, reload: () => {} }),
+  resolveIncident: resolve,
 }))
 
 afterEach(() => {
   incident.data = []
   updates.data = []
+  management.data = []
+  resolve.mockClear()
   cleanup()
   window.location.hash = ''
 })
@@ -103,4 +109,36 @@ test('General Updates for the Incident show newest first, with when they were po
   const items = within(screen.getByRole('list', { name: 'General Updates' })).getAllByRole('listitem')
   expect(items.map(item => item.querySelector('p')?.textContent)).toEqual(['Water is at the Havasupai Gardens station.', 'Stay off the River Trail.'])
   expect(items[0].querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:30:00Z')
+})
+
+test('resolved Incidents are available as history and hidden from the active list', () => {
+  incident.data = [flood('active', 'Current flood'), { ...flood('old', 'Old flood'), resolved_at: '2026-10-31T18:00:00Z' }]
+  render(<App />)
+  expect(screen.queryByRole('button', { name: /Old flood/ })).toBeNull()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Show resolved Incidents' }))
+  fireEvent.click(screen.getByRole('button', { name: /Old flood/ }))
+  expect(screen.getByRole('heading', { level: 1, name: 'Old flood' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Resolve Incident' })).toBeNull()
+})
+
+test('Coordinator statistics use Incident IDs and resolution requires confirmation', async () => {
+  incident.data = [flood('one', 'Flood'), flood('two', 'Flood')]
+  management.data = [{ cases: [
+    { caseId: 'c1', incidentId: 'one', traveler: 'Maya', incident: 'Flood', at: '2026-10-31T13:00:00Z', owner: null, ownedByMe: false, status: 'unconfirmed' },
+    { caseId: 'c2', incidentId: 'two', traveler: 'Maya', incident: 'Flood', at: '2026-10-31T13:00:00Z', owner: null, ownedByMe: false, status: 'safe' },
+  ] }]
+  render(<App />)
+  const controls = screen.getByRole('region', { name: 'Coordinator Incident controls' })
+  expect(within(controls).getByText('1 total · 1 unresolved')).toBeTruthy()
+  expect(within(controls).getByRole('list', { name: 'Incident Case statistics' }).textContent).toContain('1Unconfirmed')
+  fireEvent.click(screen.getByRole('button', { name: 'Resolve Incident' }))
+  expect(resolve).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm resolution' }))
+  await waitFor(() => expect(resolve).toHaveBeenCalledWith('one'))
+})
+
+test('public visitors see no Coordinator controls or Case statistics', () => {
+  incident.data = [flood('one', 'Flood')]
+  render(<App />)
+  expect(screen.queryByRole('region', { name: 'Coordinator Incident controls' })).toBeNull()
 })

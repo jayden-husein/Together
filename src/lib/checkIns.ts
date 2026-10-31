@@ -16,7 +16,7 @@ export type CheckInRequest = { caseId: string; incident: string; nearestResource
 // `withdrawn`: the latest Correction had no stops still to come.
 // For Needs assistance: `urgency` (Case rules), `urgencyQuote` the AI's quote behind its proposal, `urgencyChanged` a Coordinator set it.
 export type QueueCase = {
-  caseId: string; traveler: string; incident: string; explanation?: string; itineraryText?: string; at: string; owner: string | null; ownedByMe: boolean
+  caseId: string; incidentId?: string; incidentResolvedAt?: string | null; traveler: string; incident: string; explanation?: string; itineraryText?: string; at: string; owner: string | null; ownedByMe: boolean
   correction?: { withdrawn: boolean; old: Stop[]; new: Stop[] }
   urgency?: Urgency | 'untriaged'; urgencyQuote?: string | null; urgencyChanged?: boolean
 } & CaseStatus
@@ -60,7 +60,7 @@ async function myCheckIns(): Promise<CheckInRequest[]> {
   const batchSize = 40
   for (let start = 0; start < ids.length; start += batchSize) {
     const batch = ids.slice(start, start + batchSize)
-    const { data } = await supabase.from('cases').select('id, incidents!inner(id, name, starts_at, ends_at, area)').in('id', batch)
+    const { data } = await supabase.from('cases').select('id, incidents!inner(id, name, starts_at, ends_at, area)').in('id', batch).is('incidents.resolved_at', null)
       .returns<{ id: string; incidents: PublicIncident }[]>().throwOnError()
     for (const { id, incidents: incident } of data) {
       cases.set(id, { caseId: id, incident: incident.name, nearestResource: nearestResourceFor(incident, stops), reports: [] })
@@ -162,9 +162,10 @@ export async function submitCheckIn(caseId: string, status: CheckInStatus, descr
 
 type QueueRow = {
   id: string
+  incident_id: string
   created_at: string
   persons: { name: string }
-  incidents: { name: string }
+  incidents: { name: string; resolved_at?: string | null }
   reports: { id: string; kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
   opening?: { note: string | null; reports: { id: string; original_text: string | null; body: { stops: Stop[] } } | null }[]
   case_events: {
@@ -200,16 +201,20 @@ async function latestCorrections(openingIds: string[]) {
   return latest
 }
 
-async function queue(): Promise<QueueCase[]> {
+async function queue(includeResolvedIncidents = false): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
-  const rows = await readPages((from, to) => supabase.from('cases').select(
-    'id, created_at, persons!inner(name), incidents!inner(name), reports(id, kind, body, created_at), case_events(action, actor, created_at, outcome, urgency, note, source_report_id), opening:case_events(note, reports(id, original_text, body))',
+  const rows = await readPages((from, to) => {
+    let query = supabase.from('cases').select(
+    'id, incident_id, created_at, persons!inner(name), incidents!inner(name,resolved_at), reports(id, kind, body, created_at), case_events(action, actor, created_at, outcome, urgency, note, source_report_id), opening:case_events(note, reports(id, original_text, body))',
   ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'released', 'resolved', 'urgency_proposed', 'urgency_changed']).eq('opening.action', 'opened')
     .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
     .order('created_at', { referencedTable: 'case_events', ascending: false })
     .order('id', { referencedTable: 'case_events', ascending: false })
-    .order('created_at').order('id').range(from, to).returns<QueueRow[]>().throwOnError())
+    .order('created_at').order('id').range(from, to)
+    if (!includeResolvedIncidents) query = query.is('incidents.resolved_at', null)
+    return query.returns<QueueRow[]>().throwOnError()
+  })
   const names = await coordinatorNames()
   const { data: { session } } = await supabase.auth.getSession()
   const latest = await latestCorrections(rows.flatMap(row => row.opening?.[0]?.reports?.id ?? []))
@@ -237,7 +242,7 @@ async function queue(): Promise<QueueCase[]> {
       e.action === 'urgency_proposed' || e.action === 'urgency_changed'
         ? [{ action: e.action, at: e.created_at, urgency: e.urgency, note: e.note, fromReport: e.source_report_id }] : []))
     return {
-      caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
+      caseId: row.id, incidentId: row.incident_id, incidentResolvedAt: row.incidents.resolved_at, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
       itineraryText: opening?.original_text ?? undefined,
       correction: inForce ? {
         old: opening.body.stops, new: inForce.body.stops,
@@ -301,7 +306,9 @@ export async function markIndividualUpdatesRead(notificationIds: string[]) {
   await supabase.rpc('mark_notifications_read', { p_ids: notificationIds }).throwOnError()
 }
 
-export function useQueue() { return usePoll(queue) }
+export function useQueue(includeResolvedIncidents = false) {
+  return usePoll(useCallback(() => queue(includeResolvedIncidents), [includeResolvedIncidents]))
+}
 
 type CaseAction = 'opened' | 'check_in_request_sent' | 'urgency_proposed' | 'urgency_changed' | 'claimed' | 'released' | 'contact_attempt' | 'note' | 'resolved'
 
@@ -402,11 +409,11 @@ export async function dismissPotentialIncident(id: string, reason: string) {
 }
 
 export type PublicIncident = {
-  id: string; name: string; created_at: string; starts_at: string; ends_at: string | null
+  id: string; name: string; created_at: string; starts_at: string; ends_at: string | null; resolved_at?: string | null
   area: { type: 'Polygon'; coordinates: number[][][] }
 }
 async function publicIncidents() {
-  return readPages((from, to) => supabase.from('incidents').select('id,name,created_at,starts_at,ends_at,area')
+  return readPages((from, to) => supabase.from('incidents').select('id,name,created_at,starts_at,ends_at,area,resolved_at')
     .order('created_at', { ascending: false }).order('id').range(from, to).returns<PublicIncident[]>().throwOnError())
 }
 export function useIncidents() { return usePoll(publicIncidents) }
@@ -445,3 +452,14 @@ async function generalUpdateNotices(): Promise<GeneralUpdateNotice[]> {
 export function useGeneralUpdateNotices() { return usePoll(generalUpdateNotices) }
 // Any kind of Notification: the database lets an Account mark only its own.
 export const markNotificationsRead = markIndividualUpdatesRead
+
+async function coordinatorIncidentCases() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return []
+  const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
+  return coordinator ? [{ cases: await queue(true) }] : []
+}
+export function useCoordinatorIncidentCases() { return usePoll(coordinatorIncidentCases) }
+export async function resolveIncident(id: string) {
+  await supabase.rpc('resolve_incident', { p_incident: id }).throwOnError()
+}

@@ -5,7 +5,8 @@ import { draftGeneralUpdate, postGeneralUpdate, useIncidents } from '../lib/chec
 // A Coordinator writes a General Update, optionally starting from an AI draft. The draft only fills the text box:
 // nothing is posted until the Coordinator presses Post.
 export default function PostGeneralUpdate() {
-  const { data } = useIncidents()
+  // A resolved Incident is history: it gets no new General Updates.
+  const data = useIncidents().data?.filter(i => !i.resolved_at)
   const [chosen, setChosen] = useState<string>()
   const incident = data?.find(i => i.id === chosen) ?? data?.[0]
   const [text, setText] = useState('')

@@ -46,7 +46,7 @@ Deno.serve(async request => {
       const matches = []
       for (let offset = 0; ; offset += 100) {
         const { data } = await db.from('incidents').select('id,area,starts_at,ends_at,cases(person_id)')
-          .eq('cases.person_id', person.id)
+          .eq('cases.person_id', person.id).is('resolved_at', null)
           .lte('starts_at', now).or('ends_at.is.null,ends_at.gte.' + now)
           .order('id').range(offset, offset + 99).throwOnError()
         const existing = data.flatMap(incident => incident.cases.map(c => ({ personId: c.person_id, incidentId: incident.id })))
