@@ -431,8 +431,10 @@ export async function postGeneralUpdate(incidentId: string, body: string) {
 // The AI's draft for the Coordinator to edit. It is only text: posting is always postGeneralUpdate.
 export async function draftGeneralUpdate(incidentId: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke('draft-general-update', { body: { incidentId } })
-  if (error) throw error
-  return data.draft
+  if (!error) return data.draft
+  // Show the function's own reason, not the generic "non-2xx status code".
+  const detail = error.context instanceof Response ? await error.context.json().catch(() => null) : null
+  throw new Error(typeof detail?.message === 'string' ? detail.message.replace(/\.$/, '') : 'check your connection and try again')
 }
 // A General Update delivered to the signed-in Account as a Notification it hasn't read yet.
 export type GeneralUpdateNotice = { notificationId: string; incident: string; body: string; at: string }
