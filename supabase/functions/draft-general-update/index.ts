@@ -19,6 +19,18 @@ function rejection(answer: unknown) {
   return `draft is ${draft.trim().length} characters`
 }
 
+// Why the draft failed, in words safe to show the Coordinator: never the model's text or a database error.
+function failure(error: unknown) {
+  const { name, status, message = '' } = (error ?? {}) as { name?: string; status?: unknown; message?: string }
+  if (name === 'APIConnectionTimeoutError') return 'the AI took too long'
+  if (typeof status === 'number') return `the AI service answered ${status}`
+  if (message.startsWith('finish reason length')) return "the AI's reply was cut off"
+  if (message.startsWith('finish reason')) return 'the AI declined'
+  if (error instanceof SyntaxError) return "the AI's reply wasn't JSON"
+  if (message.startsWith('the AI output check')) return "the AI's draft didn't pass the check"
+  return 'something went wrong on the server'
+}
+
 // Drafts a General Update about an Incident for the signed-in Coordinator to edit. It returns text and writes nothing:
 // posting is the Coordinator's own insert. Only the Incident and the hard-coded Resources reach the model, never a person.
 Deno.serve(async request => {
@@ -38,13 +50,14 @@ Deno.serve(async request => {
       incident: { name: incident.name, starts: incident.starts_at, ends: incident.ends_at ?? 'ongoing' },
       resources: resources.map(r => ({ name: r.name, kind: RESOURCE_KIND_LABEL[r.kind], availability: r.availability, updated: r.updatedAt })),
     }
-    const answer = await askModel({ name: 'general_update', schema, system, maxTokens: 1000, timeout: 20_000, user: JSON.stringify(facts) })
+    // GPT-6 Luna spends hidden reasoning tokens from maxTokens, and a small budget can run out before the reply.
+    const answer = await askModel({ name: 'general_update', schema, system, maxTokens: 4000, timeout: 30_000, user: JSON.stringify(facts) })
     const draft = draftedUpdate(answer)
     // Say why, without the text: which fields came back and how long the draft was.
     if (!draft) throw new Error(`the AI output check rejected the draft (${rejection(answer)})`)
     return reply(200, { draft })
   } catch (error) {
     console.error('Draft General Update failed', error instanceof Error ? error.message : 'unknown error')
-    return reply(502, { message: 'Could not draft a General Update.' })
+    return reply(502, { message: `Could not draft a General Update: ${failure(error)}.` })
   }
 })
