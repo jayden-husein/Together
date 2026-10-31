@@ -26,15 +26,15 @@ const [maya] = check(await db.from('persons').insert({ account_id: ids.maya, nam
 check(await db.from('emergency_contacts').insert({ person_id: maya.id, account_id: ids.emergencyContact, demo }))
 check(await db.from('coordinators').insert({ account_id: ids.coordinator, demo }))
 
-// Hand-made flash flood around the Navajo Bridge overlook, Marble Canyon (GeoJSON is [lng, lat]).
+// Hand-made flash flood along Bright Angel Creek at Phantom Ranch and the Black Bridge (GeoJSON is [lng, lat]).
 const [incident] = check(
   await db
     .from('incidents')
     .insert({
-      name: 'Flash flood at the bridge overlook',
+      name: 'Flash flood at Phantom Ranch',
       area: {
         type: 'Polygon',
-        coordinates: [[[-111.638, 36.812], [-111.625, 36.812], [-111.625, 36.822], [-111.638, 36.822], [-111.638, 36.812]]],
+        coordinates: [[[-112.1, 36.095], [-112.085, 36.095], [-112.085, 36.112], [-112.1, 36.112], [-112.1, 36.095]]],
       },
       starts_at: new Date(Date.now() - 30 * 60_000).toISOString(),
       demo,

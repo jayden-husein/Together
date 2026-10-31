@@ -4,7 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { accounts, serverClient, publishableKey, signIn, url } from './demo.ts'
 
 const privateTables = ['persons', 'emergency_contacts', 'coordinators', 'cases', 'reports', 'case_events', 'notifications']
-const individualUpdateFields = ['case_id', 'incident_id', 'person_name', 'at', 'source_kind', 'status', 'urgency', 'outcome']
+const individualUpdateFields = ['case_id', 'incident_id', 'person_name', 'at', 'entry_kind', 'source', 'status', 'urgency', 'outcome']
 let failures = 0
 function expect(ok: boolean, what: string) {
   console.log(`${ok ? 'pass' : 'FAIL'}  ${what}`)
@@ -33,7 +33,7 @@ const { data: updates } = await contact.rpc('contact_case_updates')
 expect(updates?.length > 0, "Emergency Contact: gets Maya's Case through contact_case_updates()")
 expect(
   updates?.every((u: object) => Object.keys(u).sort().join() === [...individualUpdateFields].sort().join()),
-  'Emergency Contact: Individual Updates carry only status, Urgency, outcome, time and source kind',
+  'Emergency Contact: Individual Updates carry only status, Urgency, outcome, time and source',
 )
 
 // Positive controls, so the empty reads above can't pass just because nothing exists.

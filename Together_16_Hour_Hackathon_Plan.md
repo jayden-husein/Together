@@ -42,9 +42,9 @@ Keep SMS delivery, native background tracking, offline synchronization, live ins
 
 Use a fictional incident in a visitor corridor, a fixed demo date and timezone, and 20 synthetic people. Display a visible simulation label. Use three authenticated demo accounts: traveler, authorized family contact, and incident coordinator. Keep an unrelated family account available for the access-control check.
 
-Maya is visiting a canyon. She pastes: "On the demo date, I will be at the visitor center from 11:00 to 12:00, then at the bridge overlook from 12:30 to 14:00." The app extracts the stops. Maya confirms the named landmarks and times, and her designated contact is already linked in the demo setup.
+Maya is visiting a canyon. She pastes: "On the demo date, I will be at the visitor center from 7:00 to 8:00, then at Phantom Ranch from 13:00 to 16:00." The app extracts the stops. Maya confirms the named landmarks and times, and her designated contact is already linked in the demo setup.
 
-A coordinator activates a synthetic flash-flood incident overlapping the overlook at 13:00. Together creates a case labeled "Planned visit overlaps incident; current whereabouts unconfirmed" and delivers an in-app check-in request. Maya's contact receives the general incident update.
+A coordinator activates a synthetic flash-flood incident overlapping Phantom Ranch at 13:30. Together creates a case labeled "Planned visit overlaps incident; current whereabouts unconfirmed" and delivers an in-app check-in request. Maya's contact receives the general incident update.
 
 Maya's contact reports that they cannot reach her. The report appears in the coordinator's queue. A suggested link, or a manual review in the core version, connects it to Maya's existing case. The coordinator confirms the connection.
 
