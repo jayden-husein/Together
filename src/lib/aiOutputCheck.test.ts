@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { proposedStops } from '../../supabase/functions/_shared/aiOutputCheck'
+import { proposedStops, proposedUrgency } from '../../supabase/functions/_shared/aiOutputCheck'
 
 // Recorded model replies; no live model calls.
 const demo = 'On November 1, 2026 I will be at the visitor center 7 to 8, then Phantom Ranch 1 to 4.'
@@ -67,4 +67,20 @@ it('lets text that tries to instruct the model change nothing outside the expect
 it('rejects a reply that is not a list of stops', () => {
   expect(() => proposedStops(demo, 'Sure! Here are your stops.')).toThrow()
   expect(() => proposedStops(demo, { stops: [null, 7] })).not.toThrow()
+})
+
+const checkIn = 'Water is rising around our tent at Phantom Ranch and my son cut his leg badly.'
+
+it('accepts a valid Urgency with a quote from the traveler\'s words', () => {
+  expect(proposedUrgency(checkIn, { urgency: 'immediate', quote: 'my son cut his leg badly' }))
+    .toEqual({ urgency: 'immediate', quote: 'my son cut his leg badly' })
+})
+
+it('leaves the Check-in Untriaged when the level is invalid or the quote is not the traveler\'s', () => {
+  expect(proposedUrgency(checkIn, { urgency: 'critical', quote: 'my son cut his leg badly' })).toBeNull()
+  expect(proposedUrgency(checkIn, { urgency: 'untriaged', quote: 'my son cut his leg badly' })).toBeNull()
+  expect(proposedUrgency(checkIn, { urgency: 'immediate', quote: 'he is unconscious' })).toBeNull()
+  expect(proposedUrgency(checkIn, { urgency: 'immediate' })).toBeNull()
+  expect(proposedUrgency(checkIn, 'Immediate!')).toBeNull()
+  expect(proposedUrgency(checkIn, null)).toBeNull()
 })

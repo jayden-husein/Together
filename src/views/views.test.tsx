@@ -219,3 +219,29 @@ test('the Emergency Contact sees a resolution with its outcome', () => {
   render(<EmergencyContact />)
   expect(within(screen.getByRole('list', { name: 'Individual Updates' })).getByText('Resolved: Not in area')).toBeTruthy()
 })
+
+test('a Needs assistance Case shows its Urgency and the traveler\'s words behind it', () => {
+  data.queue = [{ ...mayaCase, urgency: 'immediate', urgencyQuote: 'my son cut his leg badly', urgencyChanged: false }]
+  render(<Coordinator />)
+  const row = within(screen.getByRole('list', { name: 'Case queue' })).getByRole('listitem')
+  expect(within(row).getByText('Immediate')).toBeTruthy()
+  expect(within(row).getByText('my son cut his leg badly')).toBeTruthy()
+  expect(row.textContent).not.toMatch(/%/)
+})
+
+test('a Coordinator changes the Urgency', async () => {
+  data.queue = [{ ...mayaCase, urgency: 'untriaged', urgencyQuote: null, urgencyChanged: false }]
+  data.history = []
+  const detail = openMayaCase()
+  fireEvent.click(detail.getByText('Change urgency', { selector: 'summary' }))
+  fireEvent.click(detail.getByLabelText('Urgent'))
+  fireEvent.click(detail.getByRole('button', { name: 'Change urgency' }))
+  await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'urgency_changed', urgency: 'urgent', note: undefined }))
+})
+
+test('the Emergency Contact sees an Urgency update without the AI\'s quote', () => {
+  data.updates = [{ caseId: 'c1', traveler: 'Maya Chen', update: { urgency: 'immediate', at: '2026-10-31T14:12:02Z' }, unreadNotificationId: null }]
+  render(<EmergencyContact />)
+  const [entry] = within(screen.getByRole('list', { name: 'Individual Updates' })).getAllByRole('listitem')
+  expect(entry.textContent).toMatch(/Maya Chen.*Urgency: Immediate/)
+})
