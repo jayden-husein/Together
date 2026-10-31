@@ -2,26 +2,33 @@
 
 A disaster accountability map, built at the AI at 70 Hackathon (Community track). When a flash flood or similar emergency hits a public place, Together pulls Itineraries and Check-ins into a shared picture of who might be caught in it. It asks those people to check in, helps emergency Coordinators follow up on the most urgent first, and keeps each traveler's Emergency Contacts informed.
 
-The demo tells one story at Grand Canyon: Maya's overlook stop overlaps a simulated flash flood. **Every person, source, Incident and Resource in it is synthetic, and the app labels it "Simulation".**
+The demo tells one story at Grand Canyon: Maya's Phantom Ranch stop overlaps a simulated flash flood. **Every person, source, Incident and Resource in it is synthetic, and the app labels it "Simulation".**
 
 - Live demo: <https://together-fdys.vercel.app>
-> **Draft until feature freeze (8:00 a.m.).** Only **Built** and the run-through results describe what works today. The other sections describe the design for the final build, and anything that isn't shipped by freeze will be moved to Planned features.
+> **Built** lists what is merged to `main` and deployed to production as of 7:20 a.m. The run-through results are filled in at feature freeze (8:00 a.m.); until then the table is empty, and nothing in this README claims a check passed.
 
 - Spec: [#4](https://github.com/jayden-husein/Together/issues/4). Terms are defined in [GLOSSARY.md](GLOSSARY.md), and decisions are recorded in [docs/adr/](docs/adr/).
 
 ## Built
 
-What works in the final build. Only list a feature here once it works end to end on the live demo. This list is final at feature freeze (8:00 a.m.).
+Everything below is merged to `main`, and its migrations and Edge Functions are deployed to production. Whether each step works end to end on the live demo is what the [run-through](#run-through-results-730-am) records.
 
-- A deployed app skeleton: a Leaflet map of Grand Canyon on OpenStreetMap tiles, a simulation label, and a message if the map can't load.
-- The Check-in loop ([#7](https://github.com/jayden-husein/Together/issues/7)). Maya signs in and answers her Check-in Request: **Safe** in one tap, or **Needs assistance** with a description of what she needs and how urgent it is. She sees each Check-in she sent and when. Within about 3 seconds, the Coordinator's queue shows her Case's new status and when it was set, ordered Needs assistance, Can't reach, Unconfirmed, Safe, then Resolved. Her Emergency Contact gets an Individual Update with the status and time only, never her description, marked **New** until they've seen it.
-- The Coordinator Case workflow ([#8](https://github.com/jayden-husein/Together/issues/8)). In the queue, the Coordinator opens a Case and claims it, and the queue then shows them as its owner. They record Contact Attempts (Reached or Not reached, with a note) and notes relaying what Responders or law enforcement found, then resolve the Case as **Reached**, **Assistance provided** or **Not in area**. The Case's history lists every Report and action with who did it, when and which Report it came from. Nothing in it can be edited or deleted; a correction is a new entry. The Emergency Contact gets an Individual Update with the outcome, never the notes.
+- **App** ([#5](https://github.com/jayden-husein/Together/issues/5), [#17](https://github.com/jayden-husein/Together/issues/17)): one responsive site with four views (public incident page, Traveler, Emergency Contact, Coordinator), a Leaflet map of Grand Canyon on OpenStreetMap tiles, a "Simulation" label on synthetic data, and status badges and Urgency tags that always carry a text label, never color alone.
+- **Shared data and access rules** ([#6](https://github.com/jayden-husein/Together/issues/6)): every record lives in Supabase with row-level security. Reports and Case events are append-only. `npm run access-check` signs in as the unrelated Account and checks it can read none of Maya's Case, Reports or Notifications.
+- **Itineraries** ([#10](https://github.com/jayden-husein/Together/issues/10), [#11](https://github.com/jayden-husein/Together/issues/11), [#37](https://github.com/jayden-husein/Together/issues/37)): Maya pastes her plans and the AI proposes stops at places from the fixed list, each with a time window, shown as pins on the map. A place it can't match asks her to choose, and a stop missing a date or time is flagged. She can edit, add or remove stops, or use the manual form if the AI fails, and nothing counts until she confirms. Her original text is kept. She can later correct or withdraw a confirmed Itinerary, and a Coordinator sees the Correction on an open Case.
+- **Potential incident** ([#12](https://github.com/jayden-husein/Together/issues/12), [#13](https://github.com/jayden-husein/Together/issues/13)): the made-up gauge reading, weather warning and news snippet are summarized into a Potential incident, quoting each source, with its area taken from the warning's own polygon. The Coordinator verifies it (optionally adjusting the times) or dismisses it with a reason. A new reading raises a new Potential incident that shows the earlier dismissal, two or more source kinds mark it **Corroborated**, and an exact duplicate delivery raises nothing. If the AI fails, a pre-written summary is used, labeled as such.
+- **Matching**: verifying an Incident opens a Case for each traveler whose confirmed stop is inside the area and overlaps its time window, explained by that stop, and sends them a Check-in Request. An Itinerary confirmed while an Incident is active is checked against it at once. There is never a second Case for the same Person and Incident.
+- **Check-in loop** ([#7](https://github.com/jayden-husein/Together/issues/7)): Maya answers her Check-in Request **Safe** in one tap, or **Needs assistance** with a description of what she needs and how urgent it is, and sees each Check-in she sent and when. Within about 3 seconds the Coordinator's queue shows her Case's new status. Her Emergency Contact gets an Individual Update with the status and time only, never her description, marked **New** until seen.
+- **Urgency triage** ([#14](https://github.com/jayden-husein/Together/issues/14)): the AI proposes Immediate, Urgent or Can wait for a Needs assistance Check-in, with a quote from her words. An invalid reply, failure or timeout makes it **Untriaged**. The queue orders Untriaged, Immediate, Urgent, Can wait, then Can't reach, Unconfirmed, Safe and Resolved. The Coordinator can change the Urgency, the change is logged and always wins, and the Emergency Contact sees the Urgency but not the quote.
+- **Coordinator Case workflow** ([#8](https://github.com/jayden-husein/Together/issues/8)): the Coordinator claims a Case, records Contact Attempts (Reached or Not reached, with a note) and notes relaying what Responders or law enforcement found, then resolves it as **Reached**, **Assistance provided** or **Not in area**. The Case's history lists every Report and action with who, when and which Report; a correction is a new entry. The Emergency Contact gets the outcome, never the notes.
+- **Can't-reach report** ([#9](https://github.com/jayden-husein/Together/issues/9)): Maya's Emergency Contact files one from her Case, and the queue shows **Can't reach** until she checks in or the Case is resolved. For anyone who isn't their traveler, the view says to contact 911 or local law enforcement, with no form.
+- **Public page** ([#15](https://github.com/jayden-husein/Together/issues/15)): without logging in, anyone sees the Incident area, simulated Resources (shelter, water, first aid) each with its source and last-updated time, and General Updates. The Coordinator writes General Updates, optionally starting from an AI draft they edit before posting. A list view shows the same content when map tiles fail or for screen readers. Maya's Check-in Request names the nearest Resource.
 
 ## Simulated
 
 - **People**: Maya, her Emergency Contact, about 20 other travelers, and one unrelated Account used to test access. All of them are made up.
 - **Sources**: a stream gauge reading, a weather warning and a news snippet, written by hand. No live sensor, weather or news feed is connected.
-- **Incident**: a flash flood near the overlook, flagged as a simulation.
+- **Incident**: a flash flood near Phantom Ranch and Black Bridge, flagged as a simulation.
 - **Resources**: shelters, water and first aid, made up, each showing a made-up source and last-updated time.
 - **Places**: the place list uses real Grand Canyon places and their real coordinates. Only the people and events are fictional.
 
@@ -159,7 +166,7 @@ These are the actual results of the run-through on fixed demo data. Each check r
 | 2 | A stop missing a date is marked for clarification, with the original text kept | | |
 | 3 | The first gauge reading raises a Potential incident; the Coordinator dismisses it | | |
 | 4 | The second gauge reading and the weather warning raise a new, Corroborated Potential incident that shows the earlier dismissal | | |
-| 5 | The Coordinator verifies it; a Case opens for Maya, explained by her overlook stop and its time window | | |
+| 5 | The Coordinator verifies it; a Case opens for Maya, explained by her Phantom Ranch stop and its time window | | |
 | 6 | A traveler at the same place on a different day gets no Case | | |
 | 7 | Verifying again opens no duplicate Case and sends no duplicate Notification | | |
 | 8 | Maya gets a Check-in Request and replies Needs assistance | | |
@@ -174,8 +181,24 @@ These are the actual results of the run-through on fixed demo data. Each check r
 | 17 | Two browser sessions see each other's changes within a few seconds | | |
 | 18 | Reset restores the demo story without touching other rows | | |
 
-### Run the flood verification demo
+### Run the demo
 
-Deploy the `potential-incident`, `extract-itinerary` and `confirm-itinerary` Edge Functions after applying migrations. Configure the server-side `DARTMOUTH_CHAT_API_KEY` secret for Itinerary extraction and Potential incident summaries. A missing key, timeout or invalid quote produces a labeled pre-written summary.
+1. Reset the demo data. It deletes and reloads only demo rows and Accounts, so nothing else is lost. It fails early if the `confirm-itinerary` or `potential-incident` Edge Function isn't deployed.
 
-Run `npm run reset-demo -- staging`, then open the Coordinator view to review the three readings and warning polygon. Verify the time window to open Cases and send Check-in Requests. To exercise concurrent verification and the access checks against a freshly reset staging demo, run `npm run access-check -- staging --verify`. Reset again to restore the pending review.
+   ```bash
+   npm run reset-demo -- staging
+   ```
+
+   Use `production` instead of `staging` for the live demo; that needs the `PRODUCTION_*` values in `.env` (see `.env.example`).
+
+2. Sign in as the Coordinator. The first gauge reading is already dismissed ("gauge sensor fault"), and a new Corroborated Potential incident from the second reading and the weather warning is waiting. Verify it to open the Cases and send the Check-in Requests.
+3. Sign in as Maya (another window) and check in. Sign in as Sam to see the Individual Updates.
+4. Run the access check. On staging, `--verify` verifies the pending Potential incident for you and also checks that two verifications at once open no duplicate Cases:
+
+   ```bash
+   npm run access-check -- staging --verify
+   ```
+
+   Reset again afterwards to restore the pending review. On production, verify the Potential incident in the Coordinator view first, then run `npm run access-check -- production`.
+
+The AI steps need the `DARTMOUTH_CHAT_API_KEY` secret on the Supabase project (`npx supabase secrets set DARTMOUTH_CHAT_API_KEY=...`). Without it, every AI step falls back as described in [How the AI is used](#how-the-ai-is-used).
