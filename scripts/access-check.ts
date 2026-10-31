@@ -94,5 +94,8 @@ expect((await coordinator.rpc('record_case_event', { p_case_id: mayaCase.id, p_a
 expect((await coordinator.rpc('record_case_event', { p_case_id: mayaCase.id, p_action: 'resolved' })).error !== null,
   'Coordinator: cannot resolve without an outcome')
 expect((await rows(coordinator, 'coordinators')).length > 0, 'Coordinator: reads Coordinator names')
+// A Can't-reach report comes only from an Emergency Contact the traveler named (ADR-0002).
+for (const [who, client] of [['unrelated Account', unrelated], ['Maya', maya], ['Coordinator', coordinator]] as const)
+  expect((await client.rpc('file_cant_reach', { p_case_id: mayaCase.id })).error !== null, `${who}: cannot file a Can't-reach report on Maya's Case`)
 
 process.exit(failures ? 1 : 0)

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { expect, expectTypeOf, test, vi } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
-import { type ContactUpdate, type IndividualUpdate, useIncidents, useCaseHistory, useIndividualUpdates, useMyCheckIns, useQueue } from './checkIns'
+import { type ContactUpdate, type IndividualUpdate, useIncidents, useCaseHistory, useContactCases, useIndividualUpdates, useMyCheckIns, useQueue } from './checkIns'
 
 let status = 'safe'
 let queueFixture = false
@@ -42,6 +42,7 @@ vi.mock('./supabase', async () => {
     }
     if (url.searchParams.get('case_id') === 'eq.case-h') {
       if (path.endsWith('/reports')) return Response.json([
+        { id: 'r0', kind: 'cant_reach', source: 'emergency_contact', created_at: '2026-10-31T05:30:00Z', original_text: null, body: { filed_by: 'sam@example.com' }, persons: { name: 'Maya' } },
         { id: 'r1', kind: 'check_in', source: 'traveler', created_at: '2026-10-31T06:00:00Z', original_text: 'Water rising', body: { status: 'needs_assistance' }, persons: { name: 'Maya' } },
       ])
       if (path.endsWith('/case_events')) return Response.json([
@@ -131,15 +132,25 @@ test('contact receives the full update history through the original screen contr
   } finally { hook.unmount() }
 })
 
+test("an Emergency Contact sees each of their travelers' Cases once, with its status", async () => {
+  const hook = renderHook(useContactCases)
+  try {
+    await waitFor(() => expect(hook.result.current.data).toHaveLength(1001))
+    expect(hook.result.current.data?.find(c => c.caseId === 'case-2')).toMatchObject({ traveler: 'Maya', status: 'resolved', outcome: 'not_in_area' })
+    expect(hook.result.current.data?.find(c => c.caseId === 'case-1')?.status).toBe('safe')
+  } finally { hook.unmount() }
+})
+
 test('a Case history merges Reports and Case events, newest first, saying who did each', async () => {
   const hook = renderHook(() => useCaseHistory('case-h'))
   try {
-    await waitFor(() => expect(hook.result.current.data).toHaveLength(5))
+    await waitFor(() => expect(hook.result.current.data).toHaveLength(6))
     expect(hook.result.current.data?.map(item => [item.entry, item.by])).toEqual([
       ['resolved', 'Coordinator #acct-gon'], // an actor no longer listed still shows as a Coordinator
       ['contact_attempt', 'Dana Ortiz'],
       ['urgency_proposed', 'AI'],
       ['check_in', 'Maya'],
+      ['cant_reach', 'Emergency Contact sam@example.com'],
       ['opened', 'Together'],
     ])
     const [resolved, attempt, proposed, checkIn] = hook.result.current.data!

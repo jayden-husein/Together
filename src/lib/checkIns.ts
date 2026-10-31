@@ -21,6 +21,8 @@ export type IndividualUpdate = {
 }
 
 export type ContactUpdate = IndividualUpdate
+// A Case of a traveler who named the signed-in Account as an Emergency Contact.
+export type ContactCase = { caseId: string; traveler: string; incident: string } & CaseStatus
 
 type PollResult<T> = { data: T[] | undefined; error: string | null }
 // `reload`: read again now, e.g. right after the Account's own change, instead of on the next poll.
@@ -191,6 +193,33 @@ async function individualUpdates(): Promise<IndividualUpdate[]> {
   }))
 }
 
+async function contactCases(): Promise<ContactCase[]> {
+  type Row = { case_id: string; incident_id: string; person_name: string } & CaseHistoryEntry
+  const rows = await readPages(async (from, to) => {
+    const { data } = await supabase.rpc('contact_case_updates')
+      .select('case_id, incident_id, person_name, status, outcome, at')
+      .in('entry_kind', ['opened', 'check_in', 'cant_reach', 'resolved'])
+      .order('at').order('case_id').order('entry_kind').range(from, to).throwOnError()
+    if (!Array.isArray(data)) throw new Error('Expected a list of Cases.')
+    return { data: data as Row[] }
+  })
+  const incidentIds = [...new Set(rows.map(r => r.incident_id))]
+  const { data: incidents } = await supabase.from('incidents').select('id, name').in('id', incidentIds).throwOnError()
+  const names = new Map(incidents.map(i => [i.id as string, i.name as string]))
+  const byCase = new Map<string, Row[]>()
+  for (const row of rows) byCase.set(row.case_id, [...byCase.get(row.case_id) ?? [], row])
+  return [...byCase.values()].map(entries => ({
+    caseId: entries[0].case_id, traveler: entries[0].person_name, incident: names.get(entries[0].incident_id) ?? 'Incident',
+    ...caseStatus(entries),
+  })).reverse()
+}
+
+export function useContactCases() { return usePoll(contactCases) }
+// Refused by the database unless the signed-in Account is an Emergency Contact of the Case's traveler.
+export async function fileCantReach(caseId: string) {
+  await supabase.rpc('file_cant_reach', { p_case_id: caseId }).throwOnError()
+}
+
 export async function markIndividualUpdatesRead(notificationIds: string[]) {
   await supabase.rpc('mark_notifications_read', { p_ids: notificationIds }).throwOnError()
 }
@@ -218,7 +247,7 @@ export type CaseHistoryItem = {
 const reportSource: Record<string, string> = { emergency_contact: 'Emergency Contact', venue: 'Venue', device: 'Device' }
 
 async function caseHistory(caseId: string): Promise<CaseHistoryItem[]> {
-  type HistoryReport = { id: string; kind: 'check_in' | 'cant_reach'; source: string; created_at: string; original_text: string | null; body: { status?: CheckInStatus }; persons: { name: string } }
+  type HistoryReport = { id: string; kind: 'check_in' | 'cant_reach'; source: string; created_at: string; original_text: string | null; body: { status?: CheckInStatus; filed_by?: string }; persons: { name: string } }
   type HistoryEvent = { id: string; action: CaseAction; actor: string | null; created_at: string; note: string | null; reached: boolean | null; outcome: Outcome | null; urgency: Urgency | null; source_report_id: string | null }
   const [reports, events, names] = await Promise.all([
     readPages((from, to) => supabase.from('reports').select('id, kind, source, created_at, original_text, body, persons!inner(name)')
@@ -231,7 +260,8 @@ async function caseHistory(caseId: string): Promise<CaseHistoryItem[]> {
   const items: CaseHistoryItem[] = [
     ...reports.map(r => ({
       ...none, id: r.id, at: r.created_at, entry: r.kind, text: r.original_text, status: r.body.status ?? null,
-      by: r.source === 'traveler' ? r.persons.name : reportSource[r.source] ?? r.source,
+      // A Can't-reach report names the Emergency Contact who filed it.
+      by: r.source === 'traveler' ? r.persons.name : [reportSource[r.source] ?? r.source, r.body.filed_by].filter(Boolean).join(' '),
     })),
     ...events.map(e => ({
       id: e.id, at: e.created_at, entry: e.action, text: e.note, status: null,
