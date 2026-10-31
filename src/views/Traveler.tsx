@@ -28,15 +28,19 @@ function Request({ request }: { request: CheckInRequest }) {
   const [message, setMessage] = useState<{ text: string; failed?: boolean }>()
 
   async function send(status: CheckInStatus) {
+    if (sending) return // A double tap would store two Check-ins.
     setSending(true)
     setMessage(undefined)
     try {
       await (status === 'safe' ? submitCheckIn(request.caseId, status) : submitCheckIn(request.caseId, status, description.trim()))
-      setAsking(false)
-      setDescription('')
+      // A Safe tap leaves any description in place, so nothing typed is lost.
+      if (status === 'needs_assistance') {
+        setAsking(false)
+        setDescription('')
+      }
       setMessage({ text: 'Check-in sent.' })
     } catch (e) {
-      // Keep the description so nothing she typed is lost; she can send again.
+      // Keep the description so nothing they typed is lost; they can send again.
       setMessage({ text: `Couldn't send your Check-in: ${e instanceof Error ? e.message : 'try again'}.`, failed: true })
     } finally {
       setSending(false)
