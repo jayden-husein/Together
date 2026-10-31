@@ -1,6 +1,6 @@
 # OpenAI GPT-6 Luna through Dartmouth Chat for the AI steps
 
-The AI steps (Itinerary extraction and the Potential incident summary now; urgency triage to follow) call OpenAI's GPT-6 Luna (`openai.gpt-6-luna`) through the Dartmouth Chat API (`https://chat.dartmouth.edu/api`), which is OpenAI-compatible, using Chat Completions with a strict JSON schema. This replaces Claude Sonnet 5.5, the model first planned. The model is called only from an Edge Function, so the `DARTMOUTH_CHAT_API_KEY` stays a Supabase Edge Function secret and never reaches the browser.
+The AI steps (Itinerary extraction and the Potential incident summary now; urgency triage to follow) call OpenAI's GPT-6 Luna (`openai.gpt-6-luna`) through the Dartmouth Chat API (`https://chat.dartmouth.edu/api`), which is OpenAI-compatible, using Chat Completions with a strict JSON schema. This replaces Claude Sonnet 5.5, the model first planned. Claude would be the first choice with API tokens, but Dartmouth Chat is free to use. The model is called only from an Edge Function, so the `DARTMOUTH_CHAT_API_KEY` stays a Supabase Edge Function secret and never reaches the browser.
 
 ## Consequences
 
