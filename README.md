@@ -2,7 +2,7 @@
 
 A disaster accountability map, built at the AI at 70 Hackathon (Community track). When a flash flood or similar emergency hits a public place, Together pulls Itineraries and Check-ins into a shared picture of who might be caught in it. It asks those people to check in, helps emergency Coordinators follow up on the most urgent first, and keeps each traveler's Emergency Contacts informed.
 
-The demo tells one story at Grand Canyon: Maya's overlook stop overlaps a simulated flash flood. **Every person, source, Incident and Resource in it is synthetic, and the app labels it "Simulation".**
+The demo tells one story at Grand Canyon: Maya's Phantom Ranch stop overlaps a simulated flash flood. **Every person, source, Incident and Resource in it is synthetic, and the app labels it "Simulation".**
 
 - Live demo: <https://together-fdys.vercel.app>
 > **Draft until feature freeze (8:00 a.m.).** Only **Built** and the run-through results describe what works today. The other sections describe the design for the final build, and anything that isn't shipped by freeze will be moved to Planned features.
@@ -151,7 +151,7 @@ The public incident page needs no login. The Traveler, Emergency Contact and Coo
 
 ## Run-through results (7:30 a.m.)
 
-These are the actual results of the run-through on fixed demo data. Each check records what we saw, not what we expected. Unfilled rows were not run yet.
+These are the actual results of the run-through on fixed demo data. Each check records what we saw, not what we expected. Unfilled rows were not run yet. How to run each check: [docs/run-through.md](docs/run-through.md).
 
 | # | Check | Result | Notes |
 | --- | --- | --- | --- |
@@ -159,7 +159,7 @@ These are the actual results of the run-through on fixed demo data. Each check r
 | 2 | A stop missing a date is marked for clarification, with the original text kept | | |
 | 3 | The first gauge reading raises a Potential incident; the Coordinator dismisses it | | |
 | 4 | The second gauge reading and the weather warning raise a new, Corroborated Potential incident that shows the earlier dismissal | | |
-| 5 | The Coordinator verifies it; a Case opens for Maya, explained by her overlook stop and its time window | | |
+| 5 | The Coordinator verifies it; a Case opens for Maya, explained by her Phantom Ranch stop and its time window | | |
 | 6 | A traveler at the same place on a different day gets no Case | | |
 | 7 | Verifying again opens no duplicate Case and sends no duplicate Notification | | |
 | 8 | Maya gets a Check-in Request and replies Needs assistance | | |
