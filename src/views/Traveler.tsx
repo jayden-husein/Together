@@ -1,3 +1,4 @@
+import Itinerary from './Itinerary'
 import { useState } from 'react'
 import { type CheckInRequest, type CheckInStatus, submitCheckIn, useMyCheckIns } from '../lib/checkIns'
 import { CheckInButtons, SourceLine, StatusBadge, statusClass } from '../ui'
@@ -17,6 +18,7 @@ export default function Traveler() {
       ) : (
         data.map(request => <Request key={request.caseId} request={request} />)
       )}
+      <Itinerary />
     </div>
   )
 }
