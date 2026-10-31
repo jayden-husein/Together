@@ -8,24 +8,24 @@ afterEach(() => {
 })
 
 test.each([
-  ['#/traveler', 'Your Check-in'],
-  ['#/contact', 'Travelers who named you'],
-  ['#/coordinator', 'Cases'],
+  ['#/traveler', 'Sign in'],
+  ['#/contact', 'Sign in'],
+  ['#/coordinator', 'Sign in'],
   ['', 'Flash flood at Phantom Ranch'],
-])('route %s shows its view with the Simulation label', (hash, heading) => {
+])('signed out, route %s shows %s with the Simulation label', async (hash, heading) => {
   window.location.hash = hash
   render(<App />)
-  expect(screen.getByRole('heading', { level: 1, name: heading })).toBeTruthy()
+  expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeTruthy()
   expect(screen.getAllByText('Simulation')).toHaveLength(1)
 })
 
-test('following a nav link switches the view', () => {
+test('following a nav link switches the view', async () => {
   render(<App />)
   act(() => {
     window.location.hash = '#/coordinator'
     window.dispatchEvent(new HashChangeEvent('hashchange'))
   })
-  expect(screen.getByRole('heading', { level: 1, name: 'Cases' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy()
 })
 
 test('public incident page shows the Simulation label and OpenStreetMap attribution', () => {
