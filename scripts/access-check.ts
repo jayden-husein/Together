@@ -19,7 +19,7 @@ async function rows(client: SupabaseClient, table: string) {
 const anon = createClient(url, publishableKey, { auth: { persistSession: false } })
 const coordinator = await signIn(accounts.coordinator)
 const { data: pending } = await coordinator.from('potential_incidents').select('id, starts_at')
-  .eq('demo', true).is('incident_id', null).maybeSingle().throwOnError()
+  .eq('demo', true).is('incident_id', null).is('dismissed_at', null).maybeSingle().throwOnError()
 if (pending) {
   if (process.argv[2] !== 'staging' || !process.argv.includes('--verify')) {
     throw new Error('Verify the pending demo Incident in the Coordinator view first, or use staging --verify.')
@@ -30,12 +30,18 @@ if (pending) {
   const { data: notices } = await coordinator.from('notifications').select('id').eq('kind', 'potential_incident')
     .eq('refers_to', pending.id).throwOnError()
   expect(notices.length === 1, 'Coordinator received the Potential incident Notification')
+  const { data: dismissed } = await coordinator.from('potential_incidents').select('id')
+    .eq('demo', true).not('dismissed_at', 'is', null).limit(1).single().throwOnError()
+  const dismissedBody = { action: 'verify', id: dismissed.id, start: pending.starts_at, end: null }
+  expect((await coordinator.functions.invoke('potential-incident', { body: dismissedBody })).error !== null, 'a dismissed Potential incident cannot be verified')
   const body = { action: 'verify', id: pending.id, start: pending.starts_at, end: null }
   const traveler = await signIn(accounts.maya)
   expect((await traveler.functions.invoke('potential-incident', { body })).error !== null, 'Traveler cannot verify')
   for (const result of await Promise.all([1, 2].map(() => coordinator.functions.invoke('potential-incident', { body })))) {
     if (result.error) throw result.error
   }
+  const { data: verified } = await server.from('incidents').select('id').eq('id', pending.id).throwOnError()
+  expect(verified.length === 1, 'verification creates exactly one Incident')
   const { data: opened } = await server.from('cases').select('id, persons!inner(account_id), case_events!inner(source_report_id, action)')
     .eq('incident_id', pending.id).eq('case_events.action', 'opened')
     .returns<{ id: string; persons: { account_id: string }; case_events: { source_report_id: string }[] }[]>().throwOnError()
@@ -92,5 +98,8 @@ expect((await coordinator.rpc('record_case_event', { p_case_id: mayaCase.id, p_a
 expect((await coordinator.rpc('record_case_event', { p_case_id: mayaCase.id, p_action: 'resolved' })).error !== null,
   'Coordinator: cannot resolve without an outcome')
 expect((await rows(coordinator, 'coordinators')).length > 0, 'Coordinator: reads Coordinator names')
+// A Can't-reach report comes only from an Emergency Contact the traveler named (ADR-0002).
+for (const [who, client] of [['unrelated Account', unrelated], ['Maya', maya], ['Coordinator', coordinator]] as const)
+  expect((await client.rpc('file_cant_reach', { p_case_id: mayaCase.id })).error !== null, `${who}: cannot file a Can't-reach report on Maya's Case`)
 
 process.exit(failures ? 1 : 0)

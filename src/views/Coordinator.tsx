@@ -1,8 +1,8 @@
-import PotentialIncidentReview from './PotentialIncidentReview'
+import PotentialIncidentReview, { DismissalLine } from './PotentialIncidentReview'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import type { Urgency } from '../lib/caseRules'
-import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
-import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, URGENCY_LABEL, UrgencyTag, formatTime, statusClass } from '../ui'
+import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, useDismissedIncidents, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
+import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, Stops, URGENCY_LABEL, UrgencyTag, formatTime, statusClass } from '../ui'
 
 // Queue order, so the summary reads the same way as the list below it.
 const STATUSES: CaseStatus[] = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved']
@@ -15,6 +15,7 @@ const SOURCE: Record<CaseStatus, string> = {
 export default function Coordinator() {
   const { data, error, reload } = useQueue()
   const pending = usePendingIncidents()
+  const dismissed = useDismissedIncidents()
   const [selected, setSelected] = useState<string>()
   const cases = data ?? []
   const open = cases.find(c => c.caseId === selected)
@@ -32,7 +33,13 @@ export default function Coordinator() {
         </ul>
       </header>
       {pending.error && <p role="alert">{pending.error}</p>}
-      {pending.data?.map(draft => <PotentialIncidentReview key={draft.id} draft={draft} onVerify={() => { pending.reload(); reload() }} />)}
+      {pending.data?.map(draft => <PotentialIncidentReview key={draft.id} draft={draft} onDecided={() => { pending.reload(); dismissed.reload(); reload() }} />)}
+      {dismissed.data?.length ? <section className="panel potential-review">
+        <h2>Dismissed Potential incidents</h2>
+        <ul className="rows" aria-label="Dismissed Potential incidents">
+          {dismissed.data.map(d => <li className="row" key={d.id}><span className="row-name">{d.name}</span><DismissalLine dismissal={d} /></li>)}
+        </ul>
+      </section> : null}
       {error && <p role="alert">{error}</p>}
       {!data ? (
         !error && <p className="empty">Loading…</p>
@@ -111,6 +118,12 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       <Triage c={c} />
       {c.explanation && <p>Matched stop: {c.explanation}</p>}
       {c.itineraryText && <blockquote aria-label="What the traveler pasted for their Itinerary">{c.itineraryText}</blockquote>}
+      {/* The Case stays open: the Coordinator decides whether the traveler is still at risk. */}
+      {c.correction && <section aria-label={c.correction.withdrawn ? 'Itinerary withdrawn' : 'Itinerary corrected'}>
+        <h3>{c.correction.withdrawn ? 'The traveler withdrew this Itinerary' : 'The traveler corrected this Itinerary'}</h3>
+        <p>Opened on:</p><Stops stops={c.correction.old} label="Stops the Case was opened on" />
+        <p>Now:</p><Stops stops={c.correction.new} label="Stops now" />
+      </section>}
       {/* Another Coordinator can take a Case over; claiming your own again would only repeat the entry. */}
       <EventForm legend="Owner" submitLabel={c.ownedByMe ? 'Unclaim' : c.owner ? 'Take over case' : 'Claim'} note="none" onSubmit={() => record({ action: c.ownedByMe ? 'released' : 'claimed' })}>
         <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
@@ -134,7 +147,8 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       <EventForm legend="Resolve" submitLabel="Resolve" note="optional" reports={reports} choices={OUTCOMES}
         onSubmit={(outcome, extra) => record({ action: 'resolved', outcome: outcome as Outcome, ...extra })} />
       </details>
-      <h3>History</h3>
+      <details className="case-tools">
+        <summary>History</summary>
       {error && <p role="alert">{error}</p>}
       {!data ? (
         !error && <p className="empty">Loading…</p>
@@ -144,6 +158,7 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
           {data.map(item => <HistoryEntry key={item.id} item={item} from={data.find(r => r.id === item.fromReport)} />)}
         </ul>
       )}
+      </details>
     </section>
   )
 }

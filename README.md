@@ -31,6 +31,8 @@ The demo seed ([#6](https://github.com/jayden-husein/Together/issues/6)) marks a
 
 OpenAI's GPT-6 Luna, reached through the Dartmouth Chat API, has three jobs ([ADR-0003](docs/adr/0003-gpt-6-luna-via-dartmouth-chat.md)). It never makes the final decision in any of them. It is called only from Supabase Edge Functions, so the API key never reaches the browser. Its replies are structured, and plain code checks every reply before it is used: each quote must appear in the input, places must come from the fixed list, and any coordinates the model supplies are ignored. If the AI fails or times out, you can still do the job by hand. Together shows no percentages or confidence scores.
 
+I would use Claude if I had API tokens, but Dartmouth Chat is free for me.
+
 | Job | What the AI does | Human checkpoint |
 | --- | --- | --- |
 | Itinerary extraction | Turns a traveler's pasted plans into stops at known places, each with a time window and a quote from the text. A stop missing a date or time is marked for clarification. | The **traveler** confirms or corrects the stops. Only confirmed stops can open a Case. |

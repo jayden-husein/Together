@@ -1,3 +1,4 @@
+import type { Stop } from '../supabase/functions/_shared/itinerary'
 import type { Outcome } from './lib/caseRules'
 import './ui.css'
 
@@ -93,4 +94,16 @@ export function SourceLine({ source, at }: { source: string; at: string }) {
       {source}, <time dateTime={at}>{formatTime(at)}</time>
     </p>
   )
+}
+
+// Grand Canyon local time: Arizona keeps MST all year.
+const localTime = new Intl.DateTimeFormat(undefined, { timeZone: 'America/Phoenix', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+export const Local = ({ at }: { at: string }) => <time dateTime={at}>{localTime.format(new Date(at))}</time>
+
+/** An Itinerary's stops, in Grand Canyon time. */
+export function Stops({ stops, label }: { stops: Stop[]; label?: string }) {
+  if (!stops.length) return <p className="empty">No stops.</p>
+  return <ol aria-label={label}>
+    {stops.map((stop, i) => <li key={i}><strong>{stop.place}</strong>: <Local at={stop.start} /> to <Local at={stop.end} /> (Grand Canyon time)</li>)}
+  </ol>
 }

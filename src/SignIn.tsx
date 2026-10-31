@@ -18,7 +18,7 @@ export function SignedIn({ children }: { children: ReactNode }) {
       {children}
       <p className="signed-in">
         Signed in as {session.user.email}.{' '}
-        <button type="button" className="link-button" onClick={() => supabase.auth.signOut()}>Sign out</button>
+        <button type="button" className="link-button" onClick={() => supabase.auth.signOut({ scope: 'local' })}>Sign out</button>
       </p>
     </>
   )
