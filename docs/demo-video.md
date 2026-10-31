@@ -6,26 +6,26 @@ Only show what passed in the run-through ([run-through.md](run-through.md)). If 
 
 ## Timeline
 
-| Time | Scene | Window on screen | Point it makes |
-| --- | --- | --- | --- |
-| 0:00–0:25 | 1. The problem | Public page (`#/`) with the map | A human always makes the final decision; nobody has one shared picture of who might be caught in a flood |
-| 0:15–0:40 | 2. Maya's plans | Traveler (Maya) | The AI reads plain text; Maya confirms |
-| 0:40–1:10 | 3. The flood | Coordinator | The AI drafts an incident, but a person verifies it |
-| 1:10–1:20 | 4. Who might be there | Coordinator queue | Plain code opens Cases, and says why |
-| 1:20–1:45 | 5. Maya checks in | Traveler, then Coordinator | AI proposes an Urgency; the Coordinator decides |
-| 1:45–2:05 | 6. Her contact | Emergency Contact (Sam) | Sam gets the status, not her private words |
-| 2:05–2:25 | 7. Follow-up | Coordinator, then Sam | Claimed, attempted, resolved, with full history |
-| 2:25–2:45 | 8. What's real | Public page, then a title card | What's simulated, and what's next |
+| Time | Scene | Voice | Window on screen | Point it makes |
+| --- | --- | --- | --- | --- |
+| 0:00–0:25 | 1. The problem | A | Public page (`#/`) with the map | A human always makes the final decision; nobody has one shared picture of who might be caught in a flood |
+| 0:15–0:40 | 2. Maya's plans | A | Traveler (Maya) | The AI reads plain text; Maya confirms |
+| 0:40–1:10 | 3. The flood | B | Coordinator | The AI drafts an incident, but a person verifies it |
+| 1:10–1:20 | 4. Who might be there | B | Coordinator queue | Plain code opens Cases, and says why |
+| 1:20–1:45 | 5. Maya checks in | B | Traveler, then Coordinator | AI proposes an Urgency; the Coordinator decides |
+| 1:45–2:05 | 6. Her contact | A | Emergency Contact (Sam) | Sam gets the status, not her private words |
+| 2:05–2:25 | 7. Follow-up | B | Coordinator, then Sam | Claimed, attempted, resolved, with full history |
+| 2:25–2:45 | 8. What's real | A | Public page, then a title card | What's simulated, and what's next |
 
 ## Script
 
-Lines in quotes are the voice-over. Each scene's word count fits its slot at a calm pace (about 150 words a minute).
+Lines in quotes are the voice-over. Two people read it: **Speaker A** voices the people side (the problem, Maya, Sam, and the close) and **Speaker B** voices the Coordinator side (the flood, the queue, triage and follow-up). That is about 220 and 190 words, and the handoffs fall at scene breaks. Each scene's word count fits its slot at a calm pace (about 150 words a minute).
 
 ### 1. The problem (0:00–0:25)
 
 **Show:** the public page, with the Simulation label and the flood area on the map.
 
-> "In our project, a human always makes the final decision. The AI only drafts; Maya confirms her own plans, and a Coordinator verifies every incident and sets every Urgency.
+> **Speaker A:** "In our project, a human always makes the final decision. The AI only drafts; Maya confirms her own plans, and a Coordinator verifies every incident and sets every Urgency.
 >
 > After a flash flood in a place like the Grand Canyon, a family knows where someone planned to go, and coordinators have scattered reports. Nobody has one picture of who might be caught in it. Together builds that picture. Everything you'll see is simulated."
 
@@ -33,43 +33,43 @@ Lines in quotes are the voice-over. Each scene's word count fits its slot at a c
 
 **Show:** Maya pastes her plans, clicks **Fill in stops**, and the stops appear with their "From your plans" quotes. Then she clicks **Confirm Itinerary**.
 
-> "Maya pastes her trip plans in her own words. The AI turns them into stops at known places, and quotes the words each stop came from. It never supplies coordinates. If her plans leave out the day, the stop is flagged for her to fill in. Nothing counts until Maya confirms it."
+> **Speaker A:** "Maya pastes her trip plans in her own words. The AI turns them into stops at known places, and quotes the words each stop came from. It never supplies coordinates. If her plans leave out the day, the stop is flagged for her to fill in. Nothing counts until Maya confirms it."
 
 ### 3. The flood (0:40–1:10)
 
 **Show:** the Coordinator view. Pause on the **Dismissed Potential incidents** row (gauge sensor fault), then the pending panel: **Corroborated**, the note about the earlier dismissal, and the source quotes. Click **Verify Incident**.
 
-> "A stream gauge, a weather warning and a news report come in. The AI summarizes them into a Potential incident, quoting each source, and the area comes from the sources themselves. Earlier, the gauge tripped alone and the Coordinator dismissed it as a sensor fault, and Together shows that. Now two sources agree. A person, not the AI, verifies it."
+> **Speaker B:** "A stream gauge, a weather warning and a news report come in. The AI summarizes them into a Potential incident, quoting each source, and the area comes from the sources themselves. Earlier, the gauge tripped alone and the Coordinator dismissed it as a sensor fault, and Together shows that. Now two sources agree. A person, not the AI, verifies it."
 
 ### 4. Who might be there (1:10–1:20)
 
 **Show:** the queue filling with Cases, then zoom in on Maya's "Matched stop: Phantom Ranch" line.
 
-> "Plain code, not the AI, matches confirmed stops to the flood. Each Case says which stop and time window opened it, and that her whereabouts are unconfirmed."
+> **Speaker B:** "Plain code, not the AI, matches confirmed stops to the flood. Each Case says which stop and time window opened it, and that her whereabouts are unconfirmed."
 
 ### 5. Maya checks in (1:20–1:45)
 
 **Show:** Maya's Check-in Request. She taps **Needs assistance**, types her need, and sends. Cut to the Coordinator queue: Needs assistance at the top with the AI's Urgency and quote. The Coordinator changes the Urgency, and the queue shows "Urgency set by a Coordinator."
 
-> "Maya gets a Check-in Request. She could tap Safe; instead she asks for help. Within seconds, her Case moves to the top. The AI proposes an Urgency and quotes her words, and the Coordinator can overrule it. If the AI fails, the Case is marked Untriaged and goes to the top anyway."
+> **Speaker B:** "Maya gets a Check-in Request. She could tap Safe; instead she asks for help. Within seconds, her Case moves to the top. The AI proposes an Urgency and quotes her words, and the Coordinator can overrule it. If the AI fails, the Case is marked Untriaged and goes to the top anyway."
 
 ### 6. Her contact (1:45–2:05)
 
 **Show:** Sam's view: the **New** Individual Update showing Maya's status and time. Sam clicks **I can't reach Maya**.
 
-> "Sam, Maya's Emergency Contact, sees that she needs assistance, and when. Sam doesn't see what she wrote. Sam can't reach her, and says so. That report goes straight into her Case."
+> **Speaker A:** "Sam, Maya's Emergency Contact, sees that she needs assistance, and when. Sam doesn't see what she wrote. Sam can't reach her, and says so. That report goes straight into her Case."
 
 ### 7. Follow-up (2:05–2:25)
 
 **Show:** the Coordinator claims Maya's Case, records a Contact Attempt marked Reached, and resolves it as **Assistance provided**. Scroll the Case history. Cut to Sam's view showing the outcome.
 
-> "The Coordinator claims the Case, records reaching her, and resolves it. Every step is in the history, with who did it and when, and nothing can be edited after the fact. Sam gets the outcome, never the notes."
+> **Speaker B:** "The Coordinator claims the Case, records reaching her, and resolves it. Every step is in the history, with who did it and when, and nothing can be edited after the fact. Sam gets the outcome, never the notes."
 
 ### 8. What's real (2:25–2:45)
 
 **Show:** the public page, then a title card with the live URL and the repo.
 
-> "The AI reads and drafts. People confirm, decide, and stay accountable. The people, sources and flood here are made up, updates arrive every three seconds, and notifications are in-app only. Next, we'd connect live weather alerts and test this with the people who'd run it."
+> **Speaker A:** "The AI reads and drafts. People confirm, decide, and stay accountable. The people, sources and flood here are made up, updates arrive every three seconds, and notifications are in-app only. Next, we'd connect live weather alerts and test this with the people who'd run it."
 
 **Title card text:**
 
