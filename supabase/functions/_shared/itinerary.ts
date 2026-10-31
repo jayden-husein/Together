@@ -9,6 +9,11 @@ export const places = {
 } as const
 
 export const maxStops = 100
+
+// Grand Canyon local time is Mountain Standard Time (UTC-7) all year: Arizona has no daylight saving time.
+export const mstOffset = '-07:00'
+// An instant as a Grand Canyon wall-clock time, YYYY-MM-DDTHH:MM (datetime-local form).
+export const localDateTime = (ms: number) => new Date(ms - 7 * 60 * 60_000).toISOString().slice(0, 16)
 // Longest pasted plan text accepted for AI extraction and stored with the Itinerary.
 export const maxTextLength = 2000
 

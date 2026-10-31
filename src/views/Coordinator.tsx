@@ -85,6 +85,8 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
     <section className="panel case-detail" aria-label={`Case: ${c.traveler}`}>
       <h2>{c.traveler}</h2>
       <p className="lede">Notes stay with Coordinators. Emergency Contacts see only the outcome.</p>
+      {c.explanation && <p>Matched stop: {c.explanation}</p>}
+      {c.itineraryText && <blockquote aria-label="What the traveler pasted for their Itinerary">{c.itineraryText}</blockquote>}
       {/* Another Coordinator can take a Case over; claiming your own again would only repeat the entry. */}
       <EventForm legend="Owner" submitLabel="Claim" note="none" disabled={c.ownedByMe} onSubmit={() => record({ action: 'claimed' })}>
         <p>{c.ownedByMe ? 'Claimed by you' : c.owner ? `Claimed by ${c.owner}` : 'Unclaimed'}</p>

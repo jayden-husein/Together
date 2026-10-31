@@ -50,7 +50,7 @@ An original submission about someone's whereabouts or condition, with its source
 _Avoid_: Record, submission, evidence (as a noun for one item)
 
 **Itinerary**:
-A Report of planned stops, each with a place and time window, confirmed by the traveler.
+A Report of planned stops, each with a place and time window, confirmed by the traveler. The traveler's **plans**, the free text they pasted for the AI to read, are kept as its original text.
 _Avoid_: Trip plan (in code), schedule
 
 **Check-in**:
