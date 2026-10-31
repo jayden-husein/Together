@@ -5,17 +5,21 @@ A disaster accountability map, built at the AI at 70 Hackathon (Community track)
 The demo tells one story at Grand Canyon: Maya's Phantom Ranch stop overlaps a simulated flash flood. **Every person, source, Incident and Resource in it is synthetic, and the app labels it "Simulation".**
 
 - Live demo: <https://together-fdys.vercel.app>
-> **Draft until feature freeze (8:00 a.m.).** Only **Built** and the run-through results describe what works today. The other sections describe the design for the final build, and anything that isn't shipped by freeze will be moved to Planned features.
+> **Final at feature freeze.** **Built** lists only what passed the run-through. Checks 15–18 weren't run, so the features they cover aren't claimed here.
 
 - Spec: [#4](https://github.com/jayden-husein/Together/issues/4). Terms are defined in [GLOSSARY.md](GLOSSARY.md), and decisions are recorded in [docs/adr/](docs/adr/).
 
 ## Built
 
-What works in the final build. Only list a feature here once it works end to end on the live demo. This list is final at feature freeze (8:00 a.m.).
+What works in the final build. Each item passed the run-through below (checks 1–14).
 
 - A deployed app skeleton: a Leaflet map of Grand Canyon on OpenStreetMap tiles, a simulation label, and a message if the map can't load.
-- The Check-in loop ([#7](https://github.com/jayden-husein/Together/issues/7)). Maya signs in and answers her Check-in Request: **Safe** in one tap, or **Needs assistance** with a description of what she needs and how urgent it is. She sees each Check-in she sent and when. Within about 3 seconds, the Coordinator's queue shows her Case's new status and when it was set, ordered Needs assistance, Can't reach, Unconfirmed, Safe, then Resolved. Her Emergency Contact gets an Individual Update with the status and time only, never her description, marked **New** until they've seen it.
-- The Coordinator Case workflow ([#8](https://github.com/jayden-husein/Together/issues/8)). In the queue, the Coordinator opens a Case and claims it, and the queue then shows them as its owner. They record Contact Attempts (Reached or Not reached, with a note) and notes relaying what Responders or law enforcement found, then resolve the Case as **Reached**, **Assistance provided** or **Not in area**. The Case's history lists every Report and action with who did it, when and which Report it came from. Nothing in it can be edited or deleted; a correction is a new entry. The Emergency Contact gets an Individual Update with the outcome, never the notes.
+- Itinerary extraction (checks 1–2). Maya pastes her plans in her own words. The AI proposes stops at known places, each with a time window and a quote from her text. A stop missing a date is marked for clarification and keeps the original text, and only stops Maya confirms count.
+- Potential incident review (checks 3–4). The first gauge reading raises a Potential incident, and the Coordinator dismisses it. The second gauge reading and the weather warning raise a new **Corroborated** Potential incident, which shows the earlier dismissal and quotes each source.
+- Verification opens Cases (checks 5–7). When the Coordinator verifies the Incident, plain code opens a Case for Maya, explained by her Phantom Ranch stop and its time window. A traveler at the same place on a different day gets no Case, and verifying again opens no duplicate Case and sends no duplicate Notification. Travelers who don't reply stay **Unconfirmed** (check 11).
+- Urgency triage (checks 9–10). For a Needs assistance Check-in, the AI proposes an Urgency with a quote from the traveler, and the Coordinator's change always wins. If the AI is off or times out, the Case is **Untriaged** at the top of the queue, and manual entry still works.
+- The Check-in loop (check 8, [#7](https://github.com/jayden-husein/Together/issues/7)). Maya signs in and answers her Check-in Request: **Safe** in one tap, or **Needs assistance** with a description of what she needs and how urgent it is. She sees each Check-in she sent and when. Within about 3 seconds, the Coordinator's queue shows her Case's new status and when it was set, ordered Needs assistance, Can't reach, Unconfirmed, Safe, then Resolved. Her Emergency Contact gets an Individual Update with the status and time only, never her description, marked **New** until they've seen it.
+- The Coordinator Case workflow (checks 12–14, [#8](https://github.com/jayden-husein/Together/issues/8)). In the queue, the Coordinator opens a Case and claims it, and the queue then shows them as its owner. They record Contact Attempts (Reached or Not reached, with a note) and notes relaying what Responders or law enforcement found, then resolve the Case as **Reached**, **Assistance provided** or **Not in area**. The Case's history lists every Report and action with who did it, when and which Report it came from. Nothing in it can be edited or deleted; a correction is a new entry. The Emergency Contact gets an Individual Update with the outcome, never the notes.
 
 ## Simulated
 
@@ -149,30 +153,30 @@ All demo accounts are synthetic, created by `npm run reset-demo`. They share one
 
 The public incident page needs no login. The Traveler, Emergency Contact and Coordinator views ask you to sign in, and one browser holds one sign-in at a time, so use a separate browser or private window for each Account.
 
-## Run-through results (7:30 a.m.)
+## Run-through results
 
-These are the actual results of the run-through on fixed demo data. Each check records what we saw, not what we expected. Unfilled rows were not run yet. How to run each check: [docs/run-through.md](docs/run-through.md).
+These are the actual results of the run-through on fixed demo data. Each check records what we saw, not what we expected. Checks 15–18 were not run before the deadline, so we make no claim about them. How to run each check: [docs/run-through.md](docs/run-through.md).
 
 | # | Check | Result | Notes |
 | --- | --- | --- | --- |
-| 1 | Maya pastes her plans; the AI proposes stops; she confirms them | | |
-| 2 | A stop missing a date is marked for clarification, with the original text kept | | |
-| 3 | The first gauge reading raises a Potential incident; the Coordinator dismisses it | | |
-| 4 | The second gauge reading and the weather warning raise a new, Corroborated Potential incident that shows the earlier dismissal | | |
-| 5 | The Coordinator verifies it; a Case opens for Maya, explained by her Phantom Ranch stop and its time window | | |
-| 6 | A traveler at the same place on a different day gets no Case | | |
-| 7 | Verifying again opens no duplicate Case and sends no duplicate Notification | | |
-| 8 | Maya gets a Check-in Request and replies Needs assistance | | |
-| 9 | The AI proposes an Urgency with a quote; the Coordinator changes it and their change wins | | |
-| 10 | AI turned off or timing out: Untriaged at the top of the queue, and manual entry still works | | |
-| 11 | A traveler who doesn't reply stays Unconfirmed | | |
-| 12 | The Emergency Contact files a Can't-reach report | | |
-| 13 | The Coordinator claims the Case, records a Contact Attempt and resolves it | | |
-| 14 | The Emergency Contact sees an Individual Update with no free text or Coordinator notes | | |
-| 15 | The unrelated Account can't read Maya's Case, Reports or Notifications, even through direct API queries (access check script, on production) | | |
-| 16 | The public page shows the Incident, Resources and General Updates without login and with no private details about anyone | | |
-| 17 | Two browser sessions see each other's changes within a few seconds | | |
-| 18 | Reset restores the demo story without touching other rows | | |
+| 1 | Maya pastes her plans; the AI proposes stops; she confirms them | Pass | |
+| 2 | A stop missing a date is marked for clarification, with the original text kept | Pass | |
+| 3 | The first gauge reading raises a Potential incident; the Coordinator dismisses it | Pass | |
+| 4 | The second gauge reading and the weather warning raise a new, Corroborated Potential incident that shows the earlier dismissal | Pass | |
+| 5 | The Coordinator verifies it; a Case opens for Maya, explained by her Phantom Ranch stop and its time window | Pass | |
+| 6 | A traveler at the same place on a different day gets no Case | Pass | |
+| 7 | Verifying again opens no duplicate Case and sends no duplicate Notification | Pass | |
+| 8 | Maya gets a Check-in Request and replies Needs assistance | Pass | |
+| 9 | The AI proposes an Urgency with a quote; the Coordinator changes it and their change wins | Pass | |
+| 10 | AI turned off or timing out: Untriaged at the top of the queue, and manual entry still works | Pass | |
+| 11 | A traveler who doesn't reply stays Unconfirmed | Pass | |
+| 12 | The Emergency Contact files a Can't-reach report | Pass | |
+| 13 | The Coordinator claims the Case, records a Contact Attempt and resolves it | Pass | |
+| 14 | The Emergency Contact sees an Individual Update with no free text or Coordinator notes | Pass | |
+| 15 | The unrelated Account can't read Maya's Case, Reports or Notifications, even through direct API queries (access check script, on production) | Not run | |
+| 16 | The public page shows the Incident, Resources and General Updates without login and with no private details about anyone | Not run | |
+| 17 | Two browser sessions see each other's changes within a few seconds | Not run | |
+| 18 | Reset restores the demo story without touching other rows | Not run | |
 
 ### Run the flood verification demo
 
