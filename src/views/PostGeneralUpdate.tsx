@@ -1,7 +1,6 @@
 import { type FormEvent, useState } from 'react'
+import { maxUpdateLength } from '../../supabase/functions/_shared/aiOutputCheck'
 import { draftGeneralUpdate, postGeneralUpdate, useIncidents } from '../lib/checkIns'
-
-const maxLength = 1000
 
 // A Coordinator writes a General Update, optionally starting from an AI draft. The draft only fills the text box:
 // nothing is posted until the Coordinator presses Post.
@@ -24,7 +23,7 @@ export default function PostGeneralUpdate() {
     } finally { setBusy(undefined) }
   }
   const draft = () => run('drafting', async () => {
-    setText((await draftGeneralUpdate(incident.id)).slice(0, maxLength))
+    setText(await draftGeneralUpdate(incident.id))
     setMessage({ text: 'AI draft ready. Check it and edit before posting.' })
   }, "Couldn't draft one; write it yourself")
   const post = (e: FormEvent) => {
@@ -50,7 +49,7 @@ export default function PostGeneralUpdate() {
             </select>
           </>}
           <label htmlFor="update-text">General Update for {incident.name}</label>
-          <textarea id="update-text" rows={4} maxLength={maxLength} value={text} onChange={e => setText(e.target.value)} />
+          <textarea id="update-text" rows={4} maxLength={maxUpdateLength} value={text} onChange={e => setText(e.target.value)} />
           <button type="button" className="button" onClick={draft}>{busy === 'drafting' ? 'Drafting…' : 'Draft with AI'}</button>
           <button type="submit" className="button" disabled={!text.trim()}>Post</button>
           {message && <p role={message.failed ? 'alert' : 'status'}>{message.text}</p>}

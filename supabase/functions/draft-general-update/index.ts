@@ -1,7 +1,8 @@
 import OpenAI from 'openai'
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0'
+import { draftedUpdate } from '../_shared/aiOutputCheck.ts'
 import { headers, reply, signedInUser } from '../_shared/http.ts'
-import { RESOURCE_KIND, resources } from '../_shared/resources.ts'
+import { RESOURCE_KIND_LABEL, resources } from '../_shared/resources.ts'
 
 const schema = { type: 'object', additionalProperties: false, required: ['draft'], properties: { draft: { type: 'string' } } }
 const system = `You draft a General Update: a short public post about an emergency at the Grand Canyon, read by anyone.
@@ -26,7 +27,7 @@ Deno.serve(async request => {
     if (!incident) return reply(404, { message: 'No such Incident.' })
     const facts = {
       incident: { name: incident.name, starts: incident.starts_at, ends: incident.ends_at ?? 'ongoing' },
-      resources: resources.map(r => ({ name: r.name, kind: RESOURCE_KIND[r.kind], availability: r.availability, updated: r.updatedAt })),
+      resources: resources.map(r => ({ name: r.name, kind: RESOURCE_KIND_LABEL[r.kind], availability: r.availability, updated: r.updatedAt })),
     }
     // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API, as for triage.
     const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 15_000, maxRetries: 0 })
@@ -38,8 +39,8 @@ Deno.serve(async request => {
     })
     const choice = completion.choices[0]
     if (choice?.finish_reason !== 'stop' || !choice.message.content) throw new Error(`finish reason ${choice?.finish_reason}`)
-    const draft = String(JSON.parse(choice.message.content).draft ?? '').trim().slice(0, 1000)
-    if (!draft) throw new Error('empty draft')
+    const draft = draftedUpdate(JSON.parse(choice.message.content))
+    if (!draft) throw new Error('the AI output check rejected the draft')
     return reply(200, { draft })
   } catch (error) {
     console.error('Draft General Update failed', error instanceof Error ? error.message : 'unknown error')

@@ -2,9 +2,9 @@ import { useGeneralUpdates, useIncidents, type PublicIncident as Incident } from
 import { useState } from 'react'
 import { divIcon, type LatLngTuple } from 'leaflet'
 import { MapContainer, Marker, Polygon, Tooltip } from 'react-leaflet'
-import { RESOURCE_KIND, resources } from '../../supabase/functions/_shared/resources'
+import { RESOURCE_KIND_LABEL, resources } from '../../supabase/functions/_shared/resources'
 import MapTiles from '../MapTiles'
-import { SourceLine, formatTime } from '../ui'
+import { SimulationLabel, SourceLine, formatTime } from '../ui'
 
 export default function PublicIncident() {
   const { data, error } = useIncidents()
@@ -42,7 +42,7 @@ export default function PublicIncident() {
         <p className="lede">The shaded area is copied from the weather warning.</p>
       </section>}
       {incident && <GeneralUpdates incidentId={incident.id} />}
-      <ResourceList />
+      {incident && <ResourceList />}
     </div>
   )
 }
@@ -57,8 +57,9 @@ function IncidentMap({ incident }: { incident?: Incident }) {
     <MapContainer className="map" bounds={rings?.[0]} boundsOptions={{ padding: [24, 24] }} center={rings ? undefined : [36.1, -112.1]} zoom={10}>
       <MapTiles onError={() => setTilesFailed(true)} />
       {rings && <Polygon positions={rings} pathOptions={{ color: 'var(--color-info-fg)', fillOpacity: 0.18 }} />}
-      {resources.map(r => <Marker key={r.name} position={[r.at[1], r.at[0]]} icon={resourceIcon} title={`${RESOURCE_KIND[r.kind]}: ${r.name} (simulated)`}>
-        <Tooltip>{RESOURCE_KIND[r.kind]}: {r.name} (simulated)</Tooltip>
+      {/* Hover text only: the Resource list below says the same, with source and time. */}
+      {incident && resources.map(r => <Marker key={r.name} position={[r.at[1], r.at[0]]} icon={resourceIcon} title={`${RESOURCE_KIND_LABEL[r.kind]}: ${r.name}`}>
+        <Tooltip>{RESOURCE_KIND_LABEL[r.kind]}: {r.name}</Tooltip>
       </Marker>)}
     </MapContainer>
   </section>
@@ -73,7 +74,7 @@ function ResourceList() {
     <p className="lede">Help available nearby. Check with staff before relying on it: nearby doesn't mean safe.</p>
     <ul className="rows" aria-label="Resources">
       {resources.map(r => <li className="row" key={r.name}>
-        <div className="row-main"><h3 className="row-name">{r.name}</h3><span className="tag">{RESOURCE_KIND[r.kind]}</span><span className="simulation">Simulated</span></div>
+        <div className="row-main"><h3 className="row-name">{r.name}</h3><span className="tag">{RESOURCE_KIND_LABEL[r.kind]}</span><SimulationLabel /></div>
         <p>{r.availability}</p>
         <SourceLine source={`${r.source}, last updated`} at={r.updatedAt} />
       </li>)}

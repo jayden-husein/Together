@@ -64,8 +64,9 @@ async function myCheckIns(): Promise<CheckInRequest[]> {
     const { data } = await supabase.from('cases').select('id, incidents!inner(id, name, starts_at, ends_at, area)').in('id', batch)
       .returns<{ id: string; incidents: PublicIncident }[]>().throwOnError()
     for (const { id, incidents: incident } of data) {
-      const stop = match('', stops, [incident])[0]?.stop
-      const ring = incident.area.coordinates[0]
+      const stop = match('me', stops, [incident])[0]?.stop // the Person id only names the result
+      // A GeoJSON ring repeats its first vertex last; count it once.
+      const ring = incident.area.coordinates[0].slice(1)
       const point = stop ? places[stop.place] : [0, 1].map(axis => ring.reduce((sum, p) => sum + p[axis], 0) / ring.length)
       cases.set(id, { caseId: id, incident: incident.name, nearestResource: nearestResource(point), reports: [] })
     }

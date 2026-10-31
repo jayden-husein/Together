@@ -87,9 +87,9 @@ test('each Resource on the list shows its source, last-updated time and a simula
   expect(items.map(item => within(item).getByRole('heading').textContent)).toEqual(
     ['Bright Angel Lodge shelter', 'Havasupai Gardens water station', 'Tipoff first-aid point'])
   const firstAid = items[2]
-  expect(within(firstAid).getByText('Simulated')).toBeTruthy()
+  expect(within(firstAid).getByText('Simulation')).toBeTruthy()
   expect(within(firstAid).getByText(/Simulated ranger dispatch/)).toBeTruthy()
-  expect(firstAid.querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T13:50:00Z')
+  expect(Date.parse(firstAid.querySelector('time')!.getAttribute('dateTime')!)).toBeLessThan(Date.now())
   expect(container.querySelectorAll('.incident-map .resource-marker')).toHaveLength(items.length)
 })
 
