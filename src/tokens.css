@@ -88,6 +88,7 @@
   --icon-size: 1.5rem;
   --mark-size: 1.75rem;
   --measure: 36rem;      /* max width of a single reading column */
+  --review-map-height: 22rem;
   --map-min-height: 18rem;
   --header-height: 3.5rem; /* the sticky app header's height */
 }
