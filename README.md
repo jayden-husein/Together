@@ -1,2 +1,2 @@
-# disaster-map
+# Together
 AI at 70 Hackathon
