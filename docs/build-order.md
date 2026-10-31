@@ -22,6 +22,37 @@ The tickets are sub-issues of the spec, [#4](https://github.com/jayden-husein/To
 
 **Critical path:** #5 → #6 → #7 → #10 → #12 → #13. A slip on any of these moves the whole schedule; everything else fits around them.
 
+## Human setup steps
+
+These need someone's own accounts, so an agent can't do them. They're slotted in where they block a ticket.
+
+| When | Step | Blocks |
+| --- | --- | --- |
+| **Now**, while #5 is built | Run `./scripts/setup-staging.sh` (one person creates staging; the others run it to save its values). | #6 |
+| **During #5**, once the app skeleton is on `main` | Vercel import and Production variables (below). | #5's "deployed" criterion |
+| **After both of the above**, before #6 opens its PR | Vercel Preview variables and deployment protection (below). | #6's preview |
+
+### Vercel import (once)
+
+1. Go to [vercel.com/new](https://vercel.com/new) → **Continue with GitHub**. When asked to install the Vercel app, choose **Only select repositories** → `jayden-husein/Together`.
+2. **Import** `Together`. Framework preset **Vite** (build `npm run build`, output `dist`).
+3. Name the project `together`.
+4. Under **Environment Variables**, add these for **Production only**:
+   - `VITE_SUPABASE_URL` = `https://ojxqgqgmtwaehtdfaxrs.supabase.co`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` = the production publishable key (Supabase → production project → Project Settings → API Keys; it starts with `sb_publishable_`).
+5. **Deploy.** From now on every merge to `main` redeploys the main URL.
+
+Never put the secret key or the Claude API key in Vercel; those are Supabase Edge Function secrets.
+
+### Vercel previews (once)
+
+Every PR gets its own preview URL, posted as a comment on the PR. Previews must use **staging**, or unfinished PRs change the production demo data.
+
+1. Vercel → `together` → **Settings → Environment Variables**. Add the same two names again with only **Preview** ticked, using `STAGING_SUPABASE_URL` and `STAGING_SUPABASE_PUBLISHABLE_KEY` from your `.env`.
+2. **Settings → Deployment Protection**: turn **Vercel Authentication** off for previews. On the free plan, teammates can't be added to your Vercel account, so otherwise they hit a login wall. Previews only show synthetic staging data.
+3. Push any commit to redeploy; variable changes only apply to new deploys.
+4. Check: open a PR's preview, sign in as a demo Account, change something, and confirm it appears in the **staging** dashboard, not in production.
+
 ## Suggested split for three people
 
 - **Person A (UI):** #17, then the UI side of #7, then #8, #9 and #15.
