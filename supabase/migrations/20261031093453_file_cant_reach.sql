@@ -11,6 +11,9 @@ begin
   if not found then
     raise exception 'Only an Emergency Contact of this traveler can file a Can''t-reach report';
   end if;
+  if exists (select 1 from public.case_events where case_id = target.id and action = 'resolved') then
+    raise exception 'This Case is resolved';
+  end if;
   -- filed_by: so the Coordinator's Case history says which Emergency Contact filed it.
   insert into public.reports(kind, person_id, case_id, source, body, demo)
     values ('cant_reach', target.person_id, target.id, 'emergency_contact',
