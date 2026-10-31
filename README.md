@@ -29,7 +29,9 @@ The demo seed ([#6](https://github.com/jayden-husein/Together/issues/6)) marks a
 
 ## How the AI is used
 
-Claude summarizes Potential incidents. Itinerary extraction uses OpenAI's GPT-6 Luna through the Dartmouth Chat API ([ADR-0003](docs/adr/0003-gpt-6-luna-via-dartmouth-chat.md)). The AI has three jobs in the design. It never makes the final decision in any of them. It is called only from Supabase Edge Functions, so the API key never reaches the browser. Its replies are structured, and plain code checks every reply before it is used: each quote must appear in the input, places must come from the fixed list, and any coordinates the model supplies are ignored. If the AI fails or times out, you can still do the job by hand. Together shows no percentages or confidence scores.
+OpenAI's GPT-6 Luna, reached through the Dartmouth Chat API, has three jobs ([ADR-0003](docs/adr/0003-gpt-6-luna-via-dartmouth-chat.md)). It never makes the final decision in any of them. It is called only from Supabase Edge Functions, so the API key never reaches the browser. Its replies are structured, and plain code checks every reply before it is used: each quote must appear in the input, places must come from the fixed list, and any coordinates the model supplies are ignored. If the AI fails or times out, you can still do the job by hand. Together shows no percentages or confidence scores.
+
+I would use Claude if I had API tokens, but Dartmouth Chat is free for me.
 
 | Job | What the AI does | Human checkpoint |
 | --- | --- | --- |
@@ -174,6 +176,6 @@ These are the actual results of the run-through on fixed demo data. Each check r
 
 ### Run the flood verification demo
 
-Deploy the `potential-incident`, `extract-itinerary` and `confirm-itinerary` Edge Functions after applying migrations. Configure the server-side `DARTMOUTH_CHAT_API_KEY` secret for Itinerary extraction and `ANTHROPIC_API_KEY` for Claude Potential incident summaries. `ANTHROPIC_MODEL` optionally overrides the default Sonnet 5.5 model. A missing key, timeout or invalid quote produces a labeled pre-written summary.
+Deploy the `potential-incident`, `extract-itinerary` and `confirm-itinerary` Edge Functions after applying migrations. Configure the server-side `DARTMOUTH_CHAT_API_KEY` secret for Itinerary extraction and Potential incident summaries. A missing key, timeout or invalid quote produces a labeled pre-written summary.
 
 Run `npm run reset-demo -- staging`, then open the Coordinator view to review the three readings and warning polygon. Verify the time window to open Cases and send Check-in Requests. To exercise concurrent verification and the access checks against a freshly reset staging demo, run `npm run access-check -- staging --verify`. Reset again to restore the pending review.
