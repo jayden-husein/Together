@@ -1,9 +1,10 @@
-import { useIncidents, useCoordinatorIncidentCases, resolveIncident, type QueueCase, type PublicIncident as Incident } from '../lib/checkIns'
+import { useGeneralUpdates, useIncidents, useCoordinatorIncidentCases, resolveIncident, type QueueCase, type PublicIncident as Incident } from '../lib/checkIns'
 import { useState } from 'react'
-import type { LatLngTuple } from 'leaflet'
-import { MapContainer, Polygon } from 'react-leaflet'
+import { divIcon, type LatLngTuple } from 'leaflet'
+import { MapContainer, Marker, Polygon, Tooltip } from 'react-leaflet'
+import { RESOURCE_KIND_LABEL, resources } from '../../supabase/functions/_shared/resources'
 import MapTiles from '../MapTiles'
-import { SourceLine, StatusBadge, formatTime } from '../ui'
+import { ResourceSource, SimulationLabel, SourceLine, StatusBadge, formatTime } from '../ui'
 
 export default function PublicIncident() {
   const { data, error, reload } = useIncidents()
@@ -45,6 +46,8 @@ export default function PublicIncident() {
         </dl>
         <p className="lede">The shaded area is copied from the weather warning.</p>
       </section>}
+      {incident && <GeneralUpdates incidentId={incident.id} />}
+      {incident && <ResourceList />}
       {incident && management.data?.[0] && <IncidentManagement key={'management-' + incident.id} incident={incident}
         cases={management.data[0].cases.filter(c => c.incidentId === incident.id)}
         onChange={() => { reload(); management.reload() }} />}
@@ -55,18 +58,53 @@ export default function PublicIncident() {
 
 function IncidentMap({ incident }: { incident?: Incident }) {
   const [tilesFailed, setTilesFailed] = useState(false)
-  const rings = incident?.area.coordinates.map(ring => ring.map(([lng, lat]): LatLngTuple => [lat, lng]))
+  const rings = incident?.area.coordinates.map(ring => ring.map(latLng))
   return <section className="incident-map" aria-label={incident ? `Area for ${incident.name}` : 'Incident map'}>
     {tilesFailed && <div className="tile-error" role="status">
-      <p>The map couldn't load. Try refreshing the page. The Incident time window is shown below.</p>
+      <p>The map couldn't load. Try refreshing the page. The Incident time window and Resources are listed below.</p>
     </div>}
     <MapContainer className="map" bounds={rings?.[0]} boundsOptions={{ padding: [24, 24] }} center={rings ? undefined : [36.1, -112.1]} zoom={10}>
       <MapTiles onError={() => setTilesFailed(true)} />
       {rings && <Polygon positions={rings} pathOptions={{ color: 'var(--color-info-fg)', fillOpacity: 0.18 }} />}
+      {/* Hover text only: the Resource list below says the same, with source and time. */}
+      {incident && resources.map(r => <Marker key={r.name} position={latLng(r.at)} icon={resourceIcon} title={`${RESOURCE_KIND_LABEL[r.kind]}: ${r.name}`}>
+        <Tooltip>{RESOURCE_KIND_LABEL[r.kind]}: {r.name}</Tooltip>
+      </Marker>)}
     </MapContainer>
   </section>
 }
 
+// GeoJSON is longitude first; Leaflet wants latitude first.
+const latLng = ([lng, lat]: readonly number[]): LatLngTuple => [lat, lng]
+const resourceIcon = divIcon({ className: 'resource-marker', iconSize: [16, 16] })
+
+// The same Resources the map marks, as a list: for screen readers and for when map tiles fail.
+function ResourceList() {
+  return <section className="panel resources" aria-labelledby="resources-heading">
+    <h2 id="resources-heading">Resources</h2>
+    <p className="lede">Help available nearby. Check with staff before relying on it: nearby doesn't mean safe.</p>
+    <ul className="rows" aria-label="Resources">
+      {resources.map(r => <li className="row" key={r.name}>
+        <div className="row-main"><h3 className="row-name">{r.name}</h3><span className="tag">{RESOURCE_KIND_LABEL[r.kind]}</span><SimulationLabel /></div>
+        <p>{r.availability}</p>
+        <ResourceSource resource={r} />
+      </li>)}
+    </ul>
+  </section>
+}
+
+function GeneralUpdates({ incidentId }: { incidentId: string }) {
+  const { data, error } = useGeneralUpdates(incidentId)
+  return <section className="panel general-updates" aria-labelledby="updates-heading">
+    <h2 id="updates-heading">General Updates</h2>
+    {error && <p role="alert">Could not load General Updates. Try refreshing the page.</p>}
+    {!data ? !error && <p className="empty">Loading…</p> : data.length === 0 ? <p className="empty">No General Updates yet.</p> : (
+      <ul className="rows" aria-label="General Updates">
+        {data.map(u => <li className="row" key={u.id}><p>{u.body}</p><SourceLine source="Posted by a Coordinator" at={u.created_at} /></li>)}
+      </ul>
+    )}
+  </section>
+}
 
 function IncidentManagement({ incident, cases, onChange }: { incident: Incident; cases: QueueCase[]; onChange: () => void }) {
   const [confirming, setConfirming] = useState(false)

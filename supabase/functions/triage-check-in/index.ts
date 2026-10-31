@@ -1,7 +1,7 @@
-import OpenAI from 'openai'
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0'
 import { proposedUrgency, urgencies } from '../_shared/aiOutputCheck.ts'
 import { headers, reply, signedInUser } from '../_shared/http.ts'
+import { askModel } from '../_shared/model.ts'
 
 const schema = {
   type: 'object', additionalProperties: false, required: ['urgency', 'quote'],
@@ -16,21 +16,11 @@ Give:
 Reply with only the JSON object.`
 
 async function propose(text: string) {
-  // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API; proposedUrgency checks the reply.
-  const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 15_000, maxRetries: 0 })
-  const completion = await dartmouth.chat.completions.create({
-    model: 'openai.gpt-6-luna',
-    max_completion_tokens: 300,
-    response_format: { type: 'json_schema', json_schema: { name: 'urgency', schema, strict: true } },
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: `<request>\n${text.replace(/<\s*\/?\s*request\b[^>]*>/gi, '')}\n</request>` },
-    ],
-  })
-  // A cut-off reply or a refusal has no usable JSON.
-  const choice = completion.choices[0]
-  if (choice?.finish_reason !== 'stop' || !choice.message.content) throw new Error(`finish reason ${choice?.finish_reason}`)
-  return proposedUrgency(text, JSON.parse(choice.message.content))
+  // proposedUrgency checks the reply.
+  return proposedUrgency(text, await askModel({
+    name: 'urgency', schema, system, maxTokens: 300,
+    user: `<request>\n${text.replace(/<\s*\/?\s*request\b[^>]*>/gi, '')}\n</request>`,
+  }))
 }
 
 // Proposes an Urgency for the latest Check-in on the signed-in traveler's Case, if it asks for assistance.
@@ -46,7 +36,7 @@ Deno.serve(async request => {
     if (typeof body?.caseId !== 'string') return reply(400, { message: 'Name the Case.' })
     const { data: report } = await db.from('reports').select('id, original_text, body, persons!inner(account_id)')
       .eq('case_id', body.caseId).eq('kind', 'check_in').order('created_at', { ascending: false }).order('id', { ascending: false })
-      .limit(1).maybeSingle().throwOnError()
+      .limit(1).maybeSingle<{ id: string; original_text: string | null; body: { status: string }; persons: { account_id: string } }>().throwOnError()
     if (!report || report.persons.account_id !== user.id) return reply(404, { message: 'No Check-in to triage.' })
     if (report.body.status !== 'needs_assistance' || !report.original_text) return reply(200, { message: 'Nothing to triage.' })
     const proposal = await propose(report.original_text).catch(error => {

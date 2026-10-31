@@ -4,6 +4,7 @@ import type { CaseHistoryItem, CheckInRequest, ConfirmedItinerary, ContactCase, 
 import Coordinator from './Coordinator'
 import EmergencyContact from './EmergencyContact'
 import Traveler from './Traveler'
+import { resources } from '../../supabase/functions/_shared/resources'
 
 const data = vi.hoisted(() => ({ myCheckIns: [] as CheckInRequest[], queue: [] as QueueCase[], updates: [] as IndividualUpdate[], contactCases: [] as ContactCase[], history: [] as CaseHistoryItem[], itineraries: [] as ConfirmedItinerary[] | undefined, itinerariesError: null as string | null }))
 const reloadItineraries = vi.hoisted(() => vi.fn())
@@ -12,11 +13,19 @@ const recordCaseEvent = vi.hoisted(() => vi.fn(async () => {}))
 const submitCheckIn = vi.hoisted(() => vi.fn(async () => {}))
 const markRead = vi.hoisted(() => vi.fn(async () => {}))
 const fileCantReach = vi.hoisted(() => vi.fn(async () => {}))
+const notices = vi.hoisted(() => ({ data: [] as import('../lib/checkIns').GeneralUpdateNotice[] }))
+const postGeneralUpdate = vi.hoisted(() => vi.fn(async () => {}))
+const draftGeneralUpdate = vi.hoisted(() => vi.fn(async () => 'Flash flooding near Phantom Ranch. Water at Havasupai Gardens.'))
 vi.mock('../lib/checkIns', () => ({
   usePendingIncidents: () => ({ data: [], error: null }),
+  useIncidents: () => ({ data: [{ id: 'incident-1', name: 'Flash flood at Phantom Ranch', created_at: '2026-10-31T13:40:00Z', starts_at: '2026-10-31T13:00:00Z', ends_at: null, area: { type: 'Polygon', coordinates: [] } }], error: null }),
+  postGeneralUpdate,
+  draftGeneralUpdate,
+  useGeneralUpdateNotices: () => ({ data: notices.data, error: null }),
   useDismissedIncidents: () => ({ data: [], error: null }),
   submitCheckIn,
   markIndividualUpdatesRead: markRead,
+  markNotificationsRead: markRead,
   useMyCheckIns: () => ({ data: data.myCheckIns, error: null }),
   recordCaseEvent,
   useQueue: () => ({ data: data.queue, error: null, reload: () => {} }),
@@ -36,13 +45,15 @@ afterEach(() => {
   markRead.mockClear()
   fileCantReach.mockClear()
   recordCaseEvent.mockClear()
+  postGeneralUpdate.mockClear()
+  notices.data = []
   reloadItineraries.mockClear()
   confirmItinerary.mockReset()
   data.itineraries = []
   data.itinerariesError = null
 })
 
-const request = (reports: CheckInRequest['reports'] = []): CheckInRequest => ({ caseId: 'case-1', incident: 'Flash flood at Phantom Ranch', reports })
+const request = (reports: CheckInRequest['reports'] = []): CheckInRequest => ({ caseId: 'case-1', incident: 'Flash flood at Phantom Ranch', nearestResource: resources[2], reports })
 
 test('Safe is one tap', async () => {
   data.myCheckIns = [request()]
@@ -454,4 +465,29 @@ test('the Emergency Contact view sends anyone else to 911 or local law enforceme
   render(<EmergencyContact />)
   expect(screen.getByText(/contact 911 or local law enforcement/)).toBeTruthy()
   expect(screen.queryByRole('textbox')).toBeNull()
+})
+
+test('an AI draft only fills the General Update for the Coordinator to edit; it posts on Post', async () => {
+  render(<Coordinator />)
+  const panel = within(screen.getByRole('region', { name: 'Post a General Update' }))
+  fireEvent.click(panel.getByRole('button', { name: 'Draft with AI' }))
+  const text = panel.getByLabelText(/General Update for Flash flood at Phantom Ranch/) as HTMLTextAreaElement
+  await waitFor(() => expect(text.value).toBe('Flash flooding near Phantom Ranch. Water at Havasupai Gardens.'))
+  expect(draftGeneralUpdate).toHaveBeenCalledWith('incident-1')
+  expect(postGeneralUpdate).not.toHaveBeenCalled()
+  fireEvent.change(text, { target: { value: 'Flash flooding near Phantom Ranch. Stay off the River Trail.' } })
+  fireEvent.click(panel.getByRole('button', { name: 'Post' }))
+  await waitFor(() => expect(postGeneralUpdate).toHaveBeenCalledWith('incident-1', 'Flash flooding near Phantom Ranch. Stay off the River Trail.'))
+  await waitFor(() => expect(text.value).toBe(''))
+})
+
+test.each([['traveler', Traveler], ['Emergency Contact', EmergencyContact]])('a %s sees a new General Update about their Incident, which is then marked read', async (_, View) => {
+  notices.data = [{ notificationId: 'n-7', incident: 'Flash flood at Phantom Ranch', body: 'Stay off the River Trail.', at: '2026-10-31T14:00:00Z' }]
+  render(<View />)
+  const item = within(screen.getByRole('list', { name: 'New General Updates' })).getByRole('listitem')
+  expect(within(item).getByText('Stay off the River Trail.')).toBeTruthy()
+  expect(within(item).getByText('New')).toBeTruthy()
+  expect(item.querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:00:00Z')
+  expect(screen.getByRole('link', { name: /public incident page/ }).getAttribute('href')).toBe('#/')
+  await waitFor(() => expect(markRead).toHaveBeenCalledWith(['n-7']))
 })

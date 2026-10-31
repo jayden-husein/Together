@@ -57,6 +57,11 @@ if (pending) {
 }
 expect((await rows(anon, 'incidents')).length > 0, 'without logging in: reads Incidents')
 for (const table of privateTables) expect((await rows(anon, table)).length === 0, `without logging in: reads no ${table}`)
+expect(!(await anon.from('general_updates').select('id, body, created_at')).error, 'without logging in: reads General Updates')
+expect(!!(await anon.from('general_updates').select('posted_by')).error, 'without logging in: cannot see who posted a General Update')
+const someIncident = (await rows(anon, 'incidents'))[0]?.id
+expect(!!(await anon.from('general_updates').insert({ incident_id: someIncident, body: 'x' })).error, 'without logging in: cannot post a General Update')
+expect(!!(await (await signIn(accounts.maya)).from('general_updates').insert({ incident_id: someIncident, body: 'x' })).error, 'Traveler cannot post a General Update')
 
 const unrelated = await signIn(accounts.unrelated)
 for (const table of privateTables) expect((await rows(unrelated, table)).length === 0, `unrelated Account: reads no ${table}`)

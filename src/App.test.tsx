@@ -5,15 +5,18 @@ import App from './App'
 const management = vi.hoisted(() => ({ data: [] as { cases: import('./lib/checkIns').QueueCase[] }[] }))
 const resolve = vi.hoisted(() => vi.fn(async () => {}))
 const incident = vi.hoisted(() => ({ data: [] as import('./lib/checkIns').PublicIncident[] }))
+const updates = vi.hoisted(() => ({ data: [] as import('./lib/checkIns').GeneralUpdate[], error: null }))
 vi.mock('./lib/checkIns', async importOriginal => ({
   ...await importOriginal<typeof import('./lib/checkIns')>(),
   useIncidents: () => ({ ...incident, reload: () => {} }),
+  useGeneralUpdates: () => updates,
   useCoordinatorIncidentCases: () => ({ ...management, error: null, reload: () => {} }),
   resolveIncident: resolve,
 }))
 
 afterEach(() => {
   incident.data = []
+  updates.data = []
   management.data = []
   resolve.mockClear()
   cleanup()
@@ -82,6 +85,31 @@ test('choosing an Incident changes the details and map and preserves selection o
   expect(screen.getByRole('button', { name: /Bridge flood/ }).getAttribute('aria-pressed')).toBe('true')
 })
 
+test('each Resource on the list shows its source, last-updated time and a simulated label, and the map marks the same Resources', () => {
+  incident.data = [flood('one', 'Flash flood at Phantom Ranch')]
+  const { container } = render(<App />)
+  const list = within(screen.getByRole('list', { name: 'Resources' }))
+  const items = list.getAllByRole('listitem')
+  expect(items.map(item => within(item).getByRole('heading').textContent)).toEqual(
+    ['Bright Angel Lodge shelter', 'Havasupai Gardens water station', 'Tipoff first-aid point'])
+  const firstAid = items[2]
+  expect(within(firstAid).getByText('Simulation')).toBeTruthy()
+  expect(within(firstAid).getByText(/Simulated ranger dispatch/)).toBeTruthy()
+  expect(Date.parse(firstAid.querySelector('time')!.getAttribute('dateTime')!)).toBeLessThan(Date.now())
+  expect(container.querySelectorAll('.incident-map .resource-marker')).toHaveLength(items.length)
+})
+
+test('General Updates for the Incident show newest first, with when they were posted', () => {
+  incident.data = [flood('one', 'Flash flood at Phantom Ranch')]
+  updates.data = [
+    { id: 'u2', body: 'Water is at the Havasupai Gardens station.', created_at: '2026-10-31T14:30:00Z' },
+    { id: 'u1', body: 'Stay off the River Trail.', created_at: '2026-10-31T14:00:00Z' },
+  ]
+  render(<App />)
+  const items = within(screen.getByRole('list', { name: 'General Updates' })).getAllByRole('listitem')
+  expect(items.map(item => item.querySelector('p')?.textContent)).toEqual(['Water is at the Havasupai Gardens station.', 'Stay off the River Trail.'])
+  expect(items[0].querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:30:00Z')
+})
 
 test('resolved Incidents are available as history and hidden from the active list', () => {
   incident.data = [flood('active', 'Current flood'), { ...flood('old', 'Old flood'), resolved_at: '2026-10-31T18:00:00Z' }]

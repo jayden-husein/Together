@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { proposedStops, proposedUrgency } from '../../supabase/functions/_shared/aiOutputCheck'
+import { draftedUpdate, maxUpdateLength, proposedStops, proposedUrgency } from '../../supabase/functions/_shared/aiOutputCheck'
 
 // Recorded model replies; no live model calls.
 const demo = 'On November 1, 2026 I will be at the visitor center 7 to 8, then Phantom Ranch 1 to 4.'
@@ -83,4 +83,17 @@ it('leaves the Check-in Untriaged when the level is invalid or the quote is not 
   expect(proposedUrgency(checkIn, { urgency: 'immediate' })).toBeNull()
   expect(proposedUrgency(checkIn, 'Immediate!')).toBeNull()
   expect(proposedUrgency(checkIn, null)).toBeNull()
+})
+
+it('accepts a drafted General Update as trimmed text for the Coordinator to edit', () => {
+  expect(draftedUpdate({ draft: '  Flash flooding near Phantom Ranch. Water at Havasupai Gardens.\n' }))
+    .toBe('Flash flooding near Phantom Ranch. Water at Havasupai Gardens.')
+})
+
+it('rejects a draft that is empty, not text, or too long to post', () => {
+  expect(draftedUpdate({ draft: '   ' })).toBeNull()
+  expect(draftedUpdate({ draft: 42 })).toBeNull()
+  expect(draftedUpdate({ draft: 'x'.repeat(maxUpdateLength + 1) })).toBeNull()
+  expect(draftedUpdate('Flash flooding.')).toBeNull()
+  expect(draftedUpdate(null)).toBeNull()
 })
