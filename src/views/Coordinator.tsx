@@ -1,4 +1,6 @@
 import PotentialIncidentReview from './PotentialIncidentReview'
+import { Local } from './Itineraries'
+import type { Stop } from '../../supabase/functions/_shared/itinerary'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
 import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, UrgencyTag, formatTime, statusClass } from '../ui'
@@ -95,6 +97,12 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       <p className="lede">Notes stay with Coordinators. Emergency Contacts see only the outcome.</p>
       {c.explanation && <p>Matched stop: {c.explanation}</p>}
       {c.itineraryText && <blockquote aria-label="What the traveler pasted for their Itinerary">{c.itineraryText}</blockquote>}
+      {/* The Case stays open: the Coordinator decides whether the traveler is still at risk. */}
+      {c.correction && <section aria-label={c.correction.withdrawn ? 'Itinerary withdrawn' : 'Itinerary corrected'}>
+        <h3>{c.correction.withdrawn ? 'The traveler withdrew this Itinerary' : 'The traveler corrected this Itinerary'}</h3>
+        <p>Opened on:</p><Stops stops={c.correction.old} label="Stops the Case was opened on" />
+        <p>Now:</p><Stops stops={c.correction.new} label="Stops now" />
+      </section>}
       {/* Another Coordinator can take a Case over; claiming your own again would only repeat the entry. */}
       <EventForm legend="Owner" submitLabel={c.ownedByMe ? 'Unclaim' : c.owner ? 'Take over case' : 'Claim'} note="none" onSubmit={() => record({ action: c.ownedByMe ? 'released' : 'claimed' })}>
         <p>{c.owner ? `Claimed by ${c.owner}${c.ownedByMe ? ' (you)' : ''}` : 'Unclaimed'}</p>
@@ -126,6 +134,13 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       </details>
     </section>
   )
+}
+
+function Stops({ stops, label }: { stops: Stop[]; label: string }) {
+  if (!stops.length) return <p className="empty">No stops.</p>
+  return <ol aria-label={label}>
+    {stops.map((stop, i) => <li key={i}><strong>{stop.place}</strong>: <Local at={stop.start} /> to <Local at={stop.end} /> (Grand Canyon time)</li>)}
+  </ol>
 }
 
 function HistoryEntry({ item, from }: { item: CaseHistoryItem; from?: CaseHistoryItem }) {

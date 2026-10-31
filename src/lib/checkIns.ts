@@ -1,7 +1,7 @@
 // Public contract for the three signed-in screens: the Check-in loop (#7) and the Coordinator Case workflow (#8).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { caseStatus, compareTimes, individualUpdateView, orderQueue, type CaseHistoryEntry, type CaseStatus, type Outcome } from './caseRules'
-import type { Stop } from '../../supabase/functions/_shared/itinerary'
+import { lockedStops, type Stop } from '../../supabase/functions/_shared/itinerary'
 import { supabase } from './supabase'
 
 export type CheckInStatus = 'safe' | 'needs_assistance'
@@ -10,8 +10,11 @@ export type CheckInRequest = { caseId: string; incident: string; reports: CheckI
 // `at`: when the status was set (the latest Report or resolution), else when the Case opened.
 // `owner`: the Coordinator with the latest claim, if any; `ownedByMe`: that claim is the signed-in Account's.
 // `itineraryText`: what the traveler pasted for the Itinerary that opened the Case, if anything.
+// `correction`: set when that Itinerary was since superseded: its stops (`old`) and those of the Itinerary in force now (`new`).
+// `withdrawn`: the latest Correction had no stops still to come.
 export type QueueCase = {
   caseId: string; traveler: string; incident: string; explanation?: string; itineraryText?: string; at: string; owner: string | null; ownedByMe: boolean
+  correction?: { withdrawn: boolean; old: Stop[]; new: Stop[] }
 } & CaseStatus
 export type IndividualUpdate = {
   caseId: string
@@ -153,7 +156,7 @@ type QueueRow = {
   persons: { name: string }
   incidents: { name: string }
   reports: { kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
-  opening?: { note: string | null; reports: { original_text: string | null } | null }[]
+  opening?: { note: string | null; reports: { id: string; original_text: string | null; body: { stops: Stop[] } } | null }[]
   case_events: { action: 'claimed' | 'released' | 'resolved'; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
 }
 
@@ -164,11 +167,31 @@ async function coordinatorNames() {
   return (accountId: string | null) => accountId ? names.get(accountId)?.trim() || `Coordinator #${accountId.slice(0, 8)}` : 'Coordinator'
 }
 
+type CorrectionRow = { id: string; supersedes: string; created_at: string; body: { stops: Stop[] } }
+// The Itinerary now in force for each superseded opening Itinerary, following chains of Corrections.
+// ponytail: one `in` list per chain step; batch the ids if the open-Case count outgrows a URL.
+async function latestCorrections(openingIds: string[]) {
+  const latest = new Map<string, CorrectionRow>()
+  let frontier = new Map(openingIds.map(id => [id, id]))
+  while (frontier.size) {
+    const { data } = await supabase.from('reports').select('id, supersedes, created_at, body').in('supersedes', [...frontier.keys()])
+      .returns<CorrectionRow[]>().throwOnError()
+    const next = new Map<string, string>()
+    for (const row of data) {
+      const opening = frontier.get(row.supersedes)!
+      latest.set(opening, row)
+      next.set(row.id, opening)
+    }
+    frontier = next
+  }
+  return latest
+}
+
 async function queue(): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
   const rows = await readPages((from, to) => supabase.from('cases').select(
-    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(action, actor, created_at, outcome), opening:case_events(note, reports(original_text))',
+    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(action, actor, created_at, outcome), opening:case_events(note, reports(id, original_text, body))',
   ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'released', 'resolved']).eq('opening.action', 'opened')
     .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
     .order('created_at', { referencedTable: 'case_events', ascending: false })
@@ -176,7 +199,10 @@ async function queue(): Promise<QueueCase[]> {
     .order('created_at').order('id').range(from, to).returns<QueueRow[]>().throwOnError())
   const names = await coordinatorNames()
   const { data: { session } } = await supabase.auth.getSession()
+  const latest = await latestCorrections(rows.flatMap(row => row.opening?.[0]?.reports?.id ?? []))
   return orderQueue(rows.map(row => {
+    const opening = row.opening?.[0]?.reports
+    const now = opening && latest.get(opening.id)
     const history: CaseHistoryEntry[] = row.reports.map(report => ({
       at: report.created_at, outcome: null,
       status: report.kind === 'cant_reach' ? 'cant_reach' : report.body.status ?? null,
@@ -194,7 +220,11 @@ async function queue(): Promise<QueueCase[]> {
     const ownedByMe = !!claim?.actor && claim.actor === session?.user.id
     return {
       caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
-      itineraryText: row.opening?.[0]?.reports?.original_text ?? undefined,
+      itineraryText: opening?.original_text ?? undefined,
+      correction: now ? {
+        old: opening.body.stops, new: now.body.stops,
+        withdrawn: lockedStops(now.body.stops, Date.parse(now.created_at)).length === now.body.stops.length,
+      } : undefined,
       at: at ?? row.created_at, owner, ownedByMe, ...status,
     }
   }))

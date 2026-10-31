@@ -6,7 +6,7 @@ import StopsMap from './StopsMap'
 
 // Grand Canyon local time: Arizona keeps MST all year.
 const localTime = new Intl.DateTimeFormat(undefined, { timeZone: 'America/Phoenix', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-const Local = ({ at }: { at: string }) => <time dateTime={at}>{localTime.format(new Date(at))}</time>
+export const Local = ({ at }: { at: string }) => <time dateTime={at}>{localTime.format(new Date(at))}</time>
 
 // The traveler's confirmed Itineraries that are in force (nothing supersedes them) and still current, newest first.
 export default function Itineraries({ data, error, onCorrect }: { data: ConfirmedItinerary[] | undefined; error: string | null; onCorrect: (itinerary: ConfirmedItinerary) => void }) {

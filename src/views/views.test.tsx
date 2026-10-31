@@ -240,6 +240,36 @@ function openMayaCase() {
   return within(screen.getByRole('region', { name: 'Case: Maya Chen' }))
 }
 
+test('a Case whose opening Itinerary was corrected shows the old and new stops; status and claim are unchanged', () => {
+  data.queue = [{ ...mayaCase, owner: 'Dana Ortiz', correction: {
+    withdrawn: false,
+    old: [{ place: 'Phantom Ranch', start: '2099-11-02T14:00:00Z', end: '2099-11-02T18:00:00Z' }],
+    new: [{ place: 'Mather Point', start: '2099-11-02T17:30:00Z', end: '2099-11-02T19:00:00Z' }],
+  } }]
+  data.history = []
+  const detail = openMayaCase()
+  const correction = within(detail.getByRole('region', { name: 'Itinerary corrected' }))
+  // Times are Grand Canyon local (UTC-7).
+  expect(within(correction.getByRole('list', { name: 'Stops the Case was opened on' })).getByText('Phantom Ranch').closest('li')?.textContent).toMatch(/7:00.*11:00/)
+  expect(within(correction.getByRole('list', { name: 'Stops now' })).getByText('Mather Point').closest('li')?.textContent).toMatch(/10:30.*12:00/)
+  expect(detail.getByText('Needs assistance')).toBeTruthy()
+  expect(detail.getByText('Claimed by Dana Ortiz')).toBeTruthy()
+})
+
+test('a Case whose opening Itinerary was withdrawn says so', () => {
+  data.queue = [{ ...mayaCase, correction: { withdrawn: true, old: [{ place: 'Phantom Ranch', start: '2099-11-02T14:00:00Z', end: '2099-11-02T18:00:00Z' }], new: [] } }]
+  data.history = []
+  const correction = within(openMayaCase().getByRole('region', { name: 'Itinerary withdrawn' }))
+  expect(correction.getByText('Phantom Ranch')).toBeTruthy()
+  expect(correction.getByText('No stops.')).toBeTruthy()
+})
+
+test('a Case whose Itinerary was not corrected shows no Correction', () => {
+  data.queue = [mayaCase]
+  data.history = []
+  expect(openMayaCase().queryByRole('region', { name: /Itinerary (corrected|withdrawn)/ })).toBeNull()
+})
+
 test('a claimed Case shows its owner in the queue', () => {
   data.queue = [{ ...mayaCase, owner: 'Dana Ortiz' }]
   render(<Coordinator />)
