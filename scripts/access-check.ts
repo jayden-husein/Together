@@ -53,5 +53,13 @@ for (const table of ['reports', 'case_events']) {
 const duplicate = await server.from('cases').insert({ incident_id: mayaCase.incident_id, person_id: mayaCase.person_id, demo: true })
 expect(duplicate.error?.code === '23505', 'a second Case for the same Incident and Person is refused')
 expect((await coordinator.from('persons').insert({ name: 'Someone else', demo: true })).error !== null, 'Coordinator: cannot add a Person')
+// Only a Coordinator writes to a Case, and only claims, Contact Attempts, notes and resolutions.
+expect((await contact.rpc('record_case_event', { p_case_id: mayaCase.id, p_action: 'note', p_note: 'x' })).error !== null,
+  'Emergency Contact: cannot add to a Case')
+expect((await coordinator.rpc('record_case_event', { p_case_id: mayaCase.id, p_action: 'opened' })).error !== null,
+  'Coordinator: cannot open a Case by hand')
+expect((await coordinator.rpc('record_case_event', { p_case_id: mayaCase.id, p_action: 'resolved' })).error !== null,
+  'Coordinator: cannot resolve without an outcome')
+expect((await rows(coordinator, 'coordinators')).length > 0, 'Coordinator: reads Coordinator names')
 
 process.exit(failures ? 1 : 0)

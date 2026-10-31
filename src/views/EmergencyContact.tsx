@@ -34,7 +34,7 @@ export default function EmergencyContact() {
               <div className="row-main">
                 <span className="row-name">{entry.traveler}</span>
                 {(entry.unreadNotificationId || fresh.has(key(entry))) && <span className="new">New</span>}
-                <StatusBadge status={entry.update.status} />
+                <StatusBadge status={entry.update.status} outcome={entry.update.outcome} />
               </div>
               <SourceLine source="Individual Update" at={entry.update.at} />
             </li>
