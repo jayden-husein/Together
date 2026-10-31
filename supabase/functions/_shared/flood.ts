@@ -1,16 +1,16 @@
 // Synthetic source packet supplied by the demo feed.
 export function floodReadings() {
-  return [
-    { name: 'Bright Angel Creek stream gauge', text: 'The creek rose 1.2 metres in thirty minutes.' },
-    { name: 'Weather service warning', text: 'Flash flooding is expected near Phantom Ranch and Black Bridge.',
+  return {
+    gauge: { name: 'Bright Angel Creek stream gauge', text: 'The creek rose 1.2 metres in thirty minutes.' },
+    warning: { name: 'Weather service warning', text: 'Flash flooding is expected near Phantom Ranch and Black Bridge.',
       area: { type: 'Polygon' as const, coordinates: [[[-112.1, 36.095], [-112.085, 36.095], [-112.085, 36.112], [-112.1, 36.112], [-112.1, 36.095]]] } },
-    { name: 'Canyon news desk', text: 'Hikers report water across the trail near Phantom Ranch.' },
-  ]
+    news: { name: 'Canyon news desk', text: 'Hikers report water across the trail near Phantom Ranch.' },
+  }
 }
 
 export async function draftFlood(readings: ReturnType<typeof floodReadings>, summarize: () => Promise<unknown>) {
-  const sources = readings.map(({ name, text }) => ({ name, text, quote: text }))
-  const area = readings[1].area!
+  const sources = [readings.gauge, readings.warning, readings.news].map(({ name, text }) => ({ name, text, quote: text }))
+  const area = readings.warning.area
   try {
     const output = await summarize()
     if (!output || typeof output !== 'object' || !('summary' in output) || typeof output.summary !== 'string'

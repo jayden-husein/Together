@@ -12,14 +12,14 @@ async function summarize(readings: ReturnType<typeof floodReadings>) {
     method: 'POST', signal: AbortSignal.timeout(15000),
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
     body: JSON.stringify({
-      model: Deno.env.get('ANTHROPIC_MODEL') || 'claude-haiku-4-5', max_tokens: 600,
+      model: Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5', max_tokens: 600,
       system: 'Summarize these synthetic flood readings for a Coordinator. Return only JSON with a short summary string and quotes, an array of one exact nonempty excerpt per reading in the supplied order.',
-      messages: [{ role: 'user', content: JSON.stringify(readings.map(({ name, text }) => ({ name, text }))) }],
+      messages: [{ role: 'user', content: JSON.stringify([readings.gauge, readings.warning, readings.news].map(({ name, text }) => ({ name, text }))) }],
     }),
   })
   if (!response.ok) throw new Error('Claude unavailable')
   const result = await response.json()
-  return JSON.parse(result.content[0].text)
+  return JSON.parse(result.content.filter((block: { type: string }) => block.type === 'text').map((block: { text: string }) => block.text).join(''))
 }
 
 async function verify(db: SupabaseClient, account: string, id: string, start: string, end: string | null) {
@@ -63,11 +63,14 @@ Deno.serve(async request => {
     if (body?.action === 'ingest' && coordinator.demo) {
       // This feed accepts only the three synthetic fixture readings.
       const readings = floodReadings()
-      if (!Array.isArray(body.readings) || body.readings.length !== readings.length ||
-        !readings.every((s, i) => s.name === body.readings[i]?.name && s.text === body.readings[i]?.text &&
-          (!s.area || (body.readings[i]?.area?.type === 'Polygon' &&
-            JSON.stringify(body.readings[i].area.coordinates) === JSON.stringify(s.area.coordinates))))) return reply(400, 'Unknown source packet.')
-      const draft = await draftFlood(body.readings, () => summarize(body.readings))
+      const packet = body.readings
+      if (!packet || !(['gauge', 'warning', 'news'] as const).every(key =>
+        packet[key]?.name === readings[key].name && packet[key].text === readings[key].text) ||
+        packet.warning.area?.type !== 'Polygon' ||
+        JSON.stringify(packet.warning.area.coordinates) !== JSON.stringify(readings.warning.area.coordinates)) {
+        return reply(400, 'Unknown source packet.')
+      }
+      const draft = await draftFlood(packet, () => summarize(packet))
       const { data } = await db.from('potential_incidents').insert({ ...draft, name: 'Flash flood at Phantom Ranch',
         starts_at: new Date(Date.now() - 30 * 60000).toISOString(), demo: true }).select('id').single().throwOnError()
       return Response.json(data, { headers })

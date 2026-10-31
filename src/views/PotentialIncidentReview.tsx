@@ -28,7 +28,7 @@ export default function PotentialIncidentReview({ draft, onVerify }: { draft: Po
     } catch { setError('Could not verify the Incident. Try again.') }
     finally { setBusy(false) }
   }
-  return <section className="panel">
+  return <section className="panel potential-review">
     <h2>Potential incident</h2>
     <h3>{draft.name}</h3>
     <p>{draft.fallback ? 'Pre-written summary' : 'AI summary'}</p>

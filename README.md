@@ -20,7 +20,7 @@ What works in the final build. Only list a feature here once it works end to end
 ## Simulated
 
 - **People**: Maya, her Emergency Contact, about 20 other travelers, and one unrelated Account used to test access. All of them are made up.
-- **Sources**: two stream gauge readings and one weather warning, written by hand. No live sensor, weather or news feed is connected.
+- **Sources**: a stream gauge reading, a weather warning and a news snippet, written by hand. No live sensor, weather or news feed is connected.
 - **Incident**: a flash flood near the overlook, flagged as a simulation.
 - **Resources**: shelters, water and first aid, made up, each showing a made-up source and last-updated time.
 - **Places**: the place list uses real Grand Canyon places and their real coordinates. Only the people and events are fictional.
@@ -34,7 +34,7 @@ Claude (Sonnet 5.5) has three jobs. It never makes the final decision in any of 
 | Job | What the AI does | Human checkpoint |
 | --- | --- | --- |
 | Itinerary extraction | Turns a traveler's pasted plans into stops at known places, each with a time window and a quote from the text. A stop missing a date or time is marked for clarification. | The **traveler** confirms or corrects the stops. Only confirmed stops can open a Case. |
-| Potential incident | Summarizes the source readings (the gauges and the weather warning) into a Potential incident, quoting each source. The incident area always comes from the source's own geometry, never from the model. | A **Coordinator** verifies or dismisses it. It affects nobody until verified. |
+| Potential incident | Summarizes the source readings (the gauge, weather warning and news snippet) into a Potential incident, quoting each source. The incident area always comes from the source's own geometry, never from the model. | A **Coordinator** verifies or dismisses it. It affects nobody until verified. |
 | Urgency triage | Proposes Immediate, Urgent or Can wait for a Needs assistance Check-in, quoting the traveler's words. Anything it can't assess becomes Untriaged, which sorts to the top of the queue. | The **Coordinator** can change the Urgency, and their change always wins. |
 
 Matching stops to an Incident, deciding who can see what, and choosing who gets Notifications are done by plain code and database rules, not by the AI.
@@ -43,7 +43,7 @@ Matching stops to an Incident, deciding who can see what, and choosing who gets 
 
 - **Polling, not realtime.** Shared data refreshes every 3 seconds, so updates can arrive up to 3 seconds late.
 - **A fixed place list, not geocoding.** Itinerary stops must be one of a short list of known Grand Canyon places.
-- **Made-up sources, not live feeds.** The gauge readings and weather warning are fixed demo data.
+- **Made-up sources, not live feeds.** The gauge reading, weather warning and news snippet are fixed demo data.
 - **Pre-linked Emergency Contacts, not invites.** The demo seed links Maya to her Emergency Contact. There is no flow for inviting a contact or for the contact to accept.
 - **Demo Accounts only.** The product would let people sign up themselves. The demo leaves that out and uses only the demo Accounts that `npm run reset-demo` creates.
 - **In-app Notifications only.** There is no SMS, email or push delivery. Someone sees a Notification only when they open the app.
