@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { confirmedStops, isCurrent, lockedStops, type Stop } from '../../supabase/functions/_shared/itinerary'
+import { confirmedStops, isCurrent, lockedStops, withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
 
 const now = Date.parse('2026-10-31T13:00:00Z')
 const stop = (start: string, end: string): Stop => ({ place: 'Phantom Ranch', start, end })
@@ -37,4 +37,11 @@ it('accepts a Correction with no stops still to come, but not a new Itinerary wi
   expect(confirmedStops([old[0]], now, old)).toEqual([old[0]])
   expect(confirmedStops([], now, [toCome])).toEqual([])
   expect(() => confirmedStops([], now)).toThrow()
+})
+
+it('withdraws when every stop had started by the time the Correction was confirmed', () => {
+  const stops: Stop[] = [{ place: 'Mather Point', start: '2026-10-31T09:00:00Z', end: '2026-10-31T10:00:00Z' }]
+  expect(withdraws([], Date.parse('2026-10-31T09:30:00Z'))).toBe(true)
+  expect(withdraws(stops, Date.parse('2026-10-31T09:00:00Z'))).toBe(true)
+  expect(withdraws(stops, Date.parse('2026-10-31T08:59:00Z'))).toBe(false)
 })

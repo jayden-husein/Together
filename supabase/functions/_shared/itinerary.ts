@@ -26,6 +26,8 @@ export const isCurrent = (stops: Stop[], now = Date.now()) => stops.some(s => Da
 
 // Stops that have started are locked: a Correction carries them over unchanged.
 export const lockedStops = (stops: Stop[], now = Date.now()) => stops.filter(s => Date.parse(s.start) <= now)
+// A Correction confirmed at `at` withdraws its Itinerary when it has no stops still to come.
+export const withdraws = (stops: Stop[], at: number) => lockedStops(stops, at).length === stops.length
 const same = (a: Stop, b: Stop) => a.place === b.place && a.start === b.start && a.end === b.end
 
 // `corrected`: the stops of the Itinerary this one supersedes, for a Correction. A Correction may have

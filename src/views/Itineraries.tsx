@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { isCurrent, lockedStops } from '../../supabase/functions/_shared/itinerary'
+import { isCurrent, lockedStops, withdraws } from '../../supabase/functions/_shared/itinerary'
 import { compareTimes } from '../lib/caseRules'
 import { AlreadyCorrectedError, confirmItinerary, type ConfirmedItinerary } from '../lib/checkIns'
 import { SourceLine } from '../ui'
@@ -7,17 +7,15 @@ import StopsMap from './StopsMap'
 
 // Grand Canyon local time: Arizona keeps MST all year.
 const localTime = new Intl.DateTimeFormat(undefined, { timeZone: 'America/Phoenix', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-const Local = ({ at }: { at: string }) => <time dateTime={at}>{localTime.format(new Date(at))}</time>
+export const Local = ({ at }: { at: string }) => <time dateTime={at}>{localTime.format(new Date(at))}</time>
 
-// A Withdraw is a Correction with no stops still to come: every stop had started when it was confirmed.
-const withdraws = (i: ConfirmedItinerary) => !!i.supersedes && i.stops.every(s => Date.parse(s.start) <= Date.parse(i.at))
 
 // The traveler's confirmed Itineraries that are in force (nothing supersedes them), still current and not withdrawn, newest first.
 // `onChange`: called after a Withdraw, or its refusal, to reload the list.
 export default function Itineraries({ data, error, onCorrect, onChange }: {
   data: ConfirmedItinerary[] | undefined; error: string | null; onCorrect: (itinerary: ConfirmedItinerary) => void; onChange: () => void
 }) {
-  const current = data?.filter(i => isCurrent(i.stops) && !withdraws(i) && !data.some(c => c.supersedes === i.id)).sort((a, b) => compareTimes(b.at, a.at))
+  const current = data?.filter(i => isCurrent(i.stops) && !(i.supersedes && withdraws(i.stops, Date.parse(i.at))) && !data.some(c => c.supersedes === i.id)).sort((a, b) => compareTimes(b.at, a.at))
   return <section className="panel">
     <h2>Your confirmed Itineraries</h2>
     {error && <p role="alert">Could not load your Itineraries: {error}</p>}
