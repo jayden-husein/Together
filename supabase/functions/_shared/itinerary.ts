@@ -9,6 +9,8 @@ export const places = {
 } as const
 
 export const maxStops = 100
+// Longest pasted plan text accepted for AI extraction and stored with the Itinerary.
+export const maxTextLength = 2000
 
 export type Place = keyof typeof places
 

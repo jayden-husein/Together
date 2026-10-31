@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { CircleMarker, MapContainer, Tooltip } from 'react-leaflet'
-import { confirmedStops, maxStops, places, type Stop } from '../../supabase/functions/_shared/itinerary'
+import type { ProposedStop } from '../../supabase/functions/_shared/aiOutputCheck'
+import { confirmedStops, maxStops, maxTextLength, places, type Stop } from '../../supabase/functions/_shared/itinerary'
 import MapTiles from '../MapTiles'
 import { supabase } from '../lib/supabase'
 
-type Draft = Omit<Stop, 'place'> & { place: string } & { key: string }
+// `quote` and `needs` come from AI extraction: the words the stop was read from, and what to fill in.
+type Draft = Omit<Stop, 'place'> & { place: string } & { key: string; quote?: string; needs?: ProposedStop['needs'] }
 const blank = (): Draft => ({ key: crypto.randomUUID(), place: '', start: '', end: '' })
 
 export default function Itinerary() {
@@ -21,10 +23,27 @@ export default function Itinerary() {
   const [saving, setSaving] = useState(false)
   const [tilesFailed, setTilesFailed] = useState(false)
   const [message, setMessage] = useState('')
+  const [text, setText] = useState('')
+  // The pasted text the current stops were read from, kept with the confirmed Itinerary.
+  const [pasted, setPasted] = useState<string | null>(null)
+  const [reading, setReading] = useState(false)
+  const [readFailed, setReadFailed] = useState(false)
   function edit(next: Draft[]) {
     setStops(next)
     setId(crypto.randomUUID())
     setMessage('')
+  }
+  async function extract() {
+    setReading(true)
+    setReadFailed(false)
+    try {
+      const { data, error } = await supabase.functions.invoke<{ stops: ProposedStop[] }>('extract-itinerary', { body: { text } })
+      if (error || !data) throw error
+      edit(data.stops.map(p => ({ key: crypto.randomUUID(), quote: p.quote, needs: p.needs, place: p.place ?? '', start: p.start ?? '', end: p.end ?? '' })))
+      setPasted(text)
+      if (!data.stops.length) setMessage('No stops found in your plans. Add them below.')
+    } catch { setReadFailed(true) }
+    finally { setReading(false) }
   }
   async function confirm() {
     setSaving(true)
@@ -32,21 +51,33 @@ export default function Itinerary() {
     try {
       // Arizona stays on Mountain Standard Time year-round at these places.
       const payload = confirmedStops(stops.map(s => ({ ...s, start: s.start + '-07:00', end: s.end + '-07:00' })))
-      const { error } = await supabase.functions.invoke('confirm-itinerary', { body: { id, stops: payload } })
+      const { error } = await supabase.functions.invoke('confirm-itinerary', { body: { id, stops: payload, originalText: pasted } })
       if (error) throw new Error('Could not confirm your Itinerary. Your stops are here to try again.')
       edit([])
+      setText('')
+      setPasted(null)
       setMessage('Itinerary confirmed.')
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not confirm your Itinerary.') }
     finally { setSaving(false) }
   }
   return <section className="panel">
     <h2>Your Itinerary</h2>
+    <form className="itinerary" onSubmit={e => { e.preventDefault(); void extract() }}>
+      <label>Paste your plans<textarea required maxLength={maxTextLength} rows={3} value={text} disabled={reading || saving}
+        placeholder="November 1: visitor center 7 to 8, then Phantom Ranch 1 to 4" onChange={e => setText(e.target.value)} /></label>
+      <div><button className="button" type="submit" disabled={reading || saving}>{reading ? 'Reading your plans…' : readFailed ? 'Try again' : 'Fill in stops'}</button></div>
+      {readFailed && <p role="alert">Could not read your plans. Try again, or add your stops yourself below.</p>}
+    </form>
     <form className="itinerary" onSubmit={e => { e.preventDefault(); void confirm() }}>
       {stops.length > 0 && <p>Enter arrival and departure in Grand Canyon local time (MST).</p>}
       {stops.map((stop, i) => {
         const change = (field: keyof Stop, value: string) => edit(stops.map(s => s.key === stop.key ? { ...s, [field]: field === 'place' ? value : value.replace(/^(\d{4})\d+(?=-)/, '$1') } : s))
         return <fieldset key={stop.key} disabled={saving}>
           <legend>Stop {i + 1}</legend>
+          {stop.quote && <p>From your plans: “{stop.quote}”</p>}
+          {stop.needs?.includes('place') && !stop.place && <p role="status">Choose which place you meant.</p>}
+          {stop.needs?.includes('date') && !stop.start && <p role="status">Your plans don't say which day. Add the date.</p>}
+          {stop.needs?.includes('time') && !stop.start && <p role="status">Add the arrival and departure times.</p>}
           <label>Place<select required value={stop.place} onChange={e => change('place', e.target.value)}>
             <option value="">Choose a place</option>
             {Object.keys(places).map(p => <option key={p}>{p}</option>)}
