@@ -8,10 +8,12 @@ export const places: Readonly<Record<string, [number, number]>> = {
   'Yavapai Point': [-112.1186, 36.0657],
 }
 
+export const maxStops = 100
+
 export type Stop = { place: string; start: string; end: string }
 
 export function confirmedStops(input: unknown): Stop[] {
-  if (!Array.isArray(input) || !input.length || input.length > 100) throw new Error('Choose 1 to 100 stops.')
+  if (!Array.isArray(input) || !input.length || input.length > maxStops) throw new Error(`Choose 1 to ${maxStops} stops.`)
   return input.map(row => {
     if (!row || typeof row.place !== 'string' || !Object.hasOwn(places, row.place)) throw new Error('Choose a listed place.')
     const { place, start, end } = row

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Tooltip } from 'react-leaflet'
-import { confirmedStops, places, type Stop } from '../../supabase/functions/_shared/itinerary'
+import { confirmedStops, maxStops, places, type Stop } from '../../supabase/functions/_shared/itinerary'
 import { supabase } from '../lib/supabase'
 
 type Draft = Stop & { key: string }
@@ -53,7 +53,7 @@ export default function Itinerary() {
           return <CircleMarker key={s.key} center={[lat, lng]} radius={7}><Tooltip>{s.place}</Tooltip></CircleMarker>
         })}
       </MapContainer>}
-      <div><button className="button" type="button" disabled={saving || stops.length >= 100} onClick={() => edit([...stops, blank()])}>Add stop</button>
+      <div><button className="button" type="button" disabled={saving || stops.length >= maxStops} onClick={() => edit([...stops, blank()])}>Add stop</button>
         {stops.length > 0 && <button className="button" disabled={saving} type="submit">Confirm Itinerary</button>}</div>
     </form>
     {message && <p role="status">{message}</p>}

@@ -1,6 +1,6 @@
 // Deletes and reloads only the demo data: the rows flagged `demo` and the demo Accounts.
 // Usage: npm run reset-demo -- staging|production
-import { accounts, serverClient, password, signIn } from './demo.ts'
+import { accounts, serverClient, password, signIn, url, publishableKey } from './demo.ts'
 
 const db = serverClient()
 const check = <T>({ data, error }: { data: T; error: unknown }) => {
@@ -8,6 +8,9 @@ const check = <T>({ data, error }: { data: T; error: unknown }) => {
   return data
 }
 
+// Check that confirmation is deployed before clearing the previous demo.
+const probe = await fetch(url + '/functions/v1/confirm-itinerary', { headers: { apikey: publishableKey } })
+if (probe.status !== 405) throw new Error('Deploy confirm-itinerary to the target project before resetting the demo.')
 check(await db.rpc('delete_demo_data'))
 
 const names = ['Maya', 'Alex', 'Jordan', 'Quinn', 'Avery', 'Riley', 'Sam', 'Taylor', 'Morgan', 'Sage',

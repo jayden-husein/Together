@@ -19,15 +19,17 @@ Deno.serve(async request => {
     let stops
     try { stops = confirmedStops(body.stops) }
     catch (e) { return reply(400, e instanceof Error ? e.message : 'Invalid stops.') }
-    const { data: person } = await db.from('persons').select('id,demo').eq('account_id', user.id).maybeSingle().throwOnError()
+    const { data: person } = await db.from('persons').select('id').eq('account_id', user.id).maybeSingle().throwOnError()
     if (!person) return reply(403, 'A traveler account is required.')
     const now = new Date().toISOString()
     const matches = []
     for (let offset = 0; ; offset += 100) {
-      const { data } = await db.from('incidents').select('id,area,starts_at,ends_at')
-        .eq('demo', person.demo).lte('starts_at', now).or('ends_at.is.null,ends_at.gte.' + now)
+      const { data } = await db.from('incidents').select('id,area,starts_at,ends_at,cases(person_id)')
+        .eq('cases.person_id', person.id)
+        .lte('starts_at', now).or('ends_at.is.null,ends_at.gte.' + now)
         .order('id').range(offset, offset + 99).throwOnError()
-      matches.push(...match(person.id, stops, data))
+      const existing = data.flatMap(incident => incident.cases.map(c => ({ personId: c.person_id, incidentId: incident.id })))
+      matches.push(...match(person.id, stops, data, existing))
       if (data.length < 100) break
     }
     await db.rpc('confirm_itinerary', { p_report: body.id, p_account: user.id, p_person: person.id, p_stops: stops, p_matches: matches }).throwOnError()
