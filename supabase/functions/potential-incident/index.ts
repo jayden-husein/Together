@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0'
 import { draftFlood, floodReadings } from '../_shared/flood.ts'
 import { match } from '../_shared/match.ts'
+import { inForce } from '../_shared/itinerary.ts'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type' }
 const reply = (status: number, message: string) => Response.json({ message }, { headers, status })
@@ -41,8 +42,7 @@ async function verify(db: SupabaseClient, account: string, id: string, start: st
       if (page.data.length < 100) break
     }
     // Only Itineraries in force match: skip those a Correction supersedes.
-    const superseded = new Set(reports.map(report => report.supersedes))
-    const matches = reports.filter(report => !superseded.has(report.id)).flatMap(report =>
+    const matches = inForce(reports).flatMap(report =>
       match(report.person_id, report.body.stops, [incident]).map(decision => ({ ...decision, reportId: report.id })))
     const { error } = await db.rpc('verify_potential_incident', { p_id: id, p_account: account,
       p_start: start, p_end: end, p_matches: matches, p_report_count: count })

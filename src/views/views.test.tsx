@@ -138,7 +138,7 @@ const startCorrecting = () => {
   fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
 }
 
-test('Correct loads the Itinerary into the form with started stops locked, and Cancel records nothing', () => {
+test('Correct loads the Itinerary into the form with started stops locked, and discarding it records nothing', () => {
   startCorrecting()
   expect(screen.getByText(/Correcting your Itinerary from/)).toBeTruthy()
   expect((screen.getByLabelText('Paste your plans') as HTMLTextAreaElement).value).toBe('Mather Point, then Phantom Ranch')
@@ -147,7 +147,7 @@ test('Correct loads the Itinerary into the form with started stops locked, and C
   expect((within(started).getByLabelText('Place') as HTMLSelectElement).value).toBe('Mather Point')
   expect((toCome as HTMLFieldSetElement).disabled).toBe(false)
   expect((within(toCome).getByLabelText('Arrival') as HTMLInputElement).value).toBe('2099-11-01T07:00')
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Discard correction' }))
   expect(screen.queryByText(/Correcting your Itinerary/)).toBeNull()
   expect(screen.queryAllByRole('group', { name: /^Stop/ })).toHaveLength(0)
   expect(confirmItinerary).not.toHaveBeenCalled()
@@ -211,10 +211,13 @@ test('withdrawing an already-corrected Itinerary is refused like Correct', async
   const ask = vi.spyOn(window, 'confirm').mockReturnValue(true)
   confirmItinerary.mockRejectedValueOnce(new AlreadyCorrectedError())
   data.itineraries = [underway()]
-  render(<Traveler />)
+  const { rerender } = render(<Traveler />)
   fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+  await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
+  // The reload shows the Correction in force instead, so the withdrawn entry leaves the list.
+  data.itineraries = [underway(), itinerary({ id: 'fix', at: '2026-10-31T10:00:00Z', supersedes: 'trip' })]
+  rerender(<Traveler />)
   expect(await screen.findByText('This Itinerary was already corrected.')).toBeTruthy()
-  expect(reloadItineraries).toHaveBeenCalled()
   ask.mockRestore()
 })
 

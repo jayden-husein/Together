@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { confirmedStops, isCurrent, lockedStops, withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
+import { confirmedStops, inForce, isCurrent, lockedStops, withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
 
 const now = Date.parse('2026-10-31T13:00:00Z')
 const stop = (start: string, end: string): Stop => ({ place: 'Phantom Ranch', start, end })
@@ -44,4 +44,15 @@ it('withdraws when every stop had started by the time the Correction was confirm
   expect(withdraws([], Date.parse('2026-10-31T09:30:00Z'))).toBe(true)
   expect(withdraws(stops, Date.parse('2026-10-31T09:00:00Z'))).toBe(true)
   expect(withdraws(stops, Date.parse('2026-10-31T08:59:00Z'))).toBe(false)
+})
+
+it('keeps every started stop in a Withdraw, including one that started after the traveler sent it', () => {
+  const later = stop('2026-10-31T12:30:00.000Z', '2026-10-31T16:00:00.000Z')
+  expect(confirmedStops([old[0]], now, [old[0], later, toCome])).toEqual([old[0], later])
+  expect(confirmedStops([], now, [old[0], later, toCome])).toEqual([old[0], later])
+})
+
+it('keeps the Itineraries no Correction supersedes', () => {
+  const reports = [{ id: 'a', supersedes: null }, { id: 'b', supersedes: 'a' }, { id: 'c', supersedes: 'b' }, { id: 'd', supersedes: null }]
+  expect(inForce(reports).map(r => r.id)).toEqual(['c', 'd'])
 })

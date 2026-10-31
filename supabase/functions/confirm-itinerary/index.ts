@@ -20,12 +20,21 @@ Deno.serve(async request => {
     if (supersedes !== null && (typeof supersedes !== 'string' || !uuid.test(supersedes))) return reply(400, { message: 'Invalid Itinerary to correct.' })
     const { data: person } = await db.from('persons').select('id').eq('account_id', user.id).maybeSingle().throwOnError()
     if (!person) return reply(403, { message: 'A traveler account is required.' })
+    // A retry of a stored confirmation succeeds before any check that depends on the time.
+    const { data: stored } = await db.from('reports').select('person_id, kind, supersedes').eq('id', body.id).maybeSingle().throwOnError()
+    if (stored) {
+      return stored.person_id === person.id && stored.kind === 'itinerary' && stored.supersedes === supersedes
+        ? reply(200, { message: 'Itinerary confirmed.' }) : reply(400, { message: 'Invalid confirmation id.' })
+    }
     // A Correction must keep the started stops of the traveler's own Itinerary it supersedes.
     let corrected
     if (supersedes) {
       const { data: old } = await db.from('reports').select('body').eq('id', supersedes).eq('person_id', person.id)
         .eq('kind', 'itinerary').maybeSingle().throwOnError()
       if (!old) return reply(400, { message: 'Invalid Itinerary to correct.' })
+      // Only an Itinerary in force can be corrected; the unique constraint still settles a race.
+      const { count } = await db.from('reports').select('id', { head: true, count: 'exact' }).eq('supersedes', supersedes).throwOnError()
+      if (count) return reply(409, { message: 'This Itinerary was already corrected.', code: 'already_corrected' })
       corrected = old.body.stops
     }
     let stops

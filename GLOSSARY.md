@@ -64,6 +64,9 @@ _Avoid_: Cancel, delete (of an Itinerary)
 **In force**:
 Said of an Itinerary that no Correction supersedes. Only Itineraries in force are listed to the traveler and matched against Incidents.
 
+**Current**:
+Said of an Itinerary with a stop that has not yet ended. The traveler's list shows only Itineraries that are current and in force.
+
 **Check-in**:
 A Report in which a traveler says they are either **Safe** or **Needs assistance**, with a description of what they need and how urgent it is.
 

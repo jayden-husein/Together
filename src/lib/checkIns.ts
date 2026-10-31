@@ -202,7 +202,7 @@ async function queue(): Promise<QueueCase[]> {
   const latest = await latestCorrections(rows.flatMap(row => row.opening?.[0]?.reports?.id ?? []))
   return orderQueue(rows.map(row => {
     const opening = row.opening?.[0]?.reports
-    const now = opening && latest.get(opening.id)
+    const inForce = opening && latest.get(opening.id)
     const history: CaseHistoryEntry[] = row.reports.map(report => ({
       at: report.created_at, outcome: null,
       status: report.kind === 'cant_reach' ? 'cant_reach' : report.body.status ?? null,
@@ -221,9 +221,9 @@ async function queue(): Promise<QueueCase[]> {
     return {
       caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
       itineraryText: opening?.original_text ?? undefined,
-      correction: now ? {
-        old: opening.body.stops, new: now.body.stops,
-        withdrawn: withdraws(now.body.stops, Date.parse(now.created_at)),
+      correction: inForce ? {
+        old: opening.body.stops, new: inForce.body.stops,
+        withdrawn: withdraws(inForce.body.stops, Date.parse(inForce.created_at)),
       } : undefined,
       at: at ?? row.created_at, owner, ownedByMe, ...status,
     }

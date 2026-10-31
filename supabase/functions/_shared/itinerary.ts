@@ -24,6 +24,12 @@ export type Stop = { place: Place; start: string; end: string }
 // An Itinerary is current while one of its stops has not yet ended.
 export const isCurrent = (stops: Stop[], now = Date.now()) => stops.some(s => Date.parse(s.end) > now)
 
+// The Itineraries in force: those no Correction among `reports` supersedes.
+export const inForce = <T extends { id: string; supersedes: string | null }>(reports: T[]) => {
+  const superseded = new Set(reports.map(r => r.supersedes))
+  return reports.filter(r => !superseded.has(r.id))
+}
+
 // Stops that have started are locked: a Correction carries them over unchanged.
 export const lockedStops = (stops: Stop[], now = Date.now()) => stops.filter(s => Date.parse(s.start) <= now)
 // A Correction confirmed at `at` withdraws its Itinerary when it has no stops still to come.
@@ -52,6 +58,8 @@ export function confirmedStops(input: unknown, now = Date.now(), corrected?: Sto
     return { place, start: new Date(start).toISOString(), end: new Date(end).toISOString() }
   })
   const locked = lockedStops(corrected ?? [], now)
+  // A Withdraw sends only started stops; it keeps every one, including any that started after it was sent.
+  if (corrected && stops.every(s => locked.some(l => same(s, l)))) return locked
   if (!locked.every(l => stops.some(s => same(s, l)))) throw new Error('Keep the stops that have started as they were.')
   // Carried-over started stops are exempt from starting from now.
   if (stops.some(s => Date.parse(s.start) < now && !locked.some(l => same(s, l)))) throw new Error('Arrival must be at the current time or later.')

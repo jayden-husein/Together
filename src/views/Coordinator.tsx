@@ -1,9 +1,7 @@
 import PotentialIncidentReview from './PotentialIncidentReview'
-import { Local } from './Itineraries'
-import type { Stop } from '../../supabase/functions/_shared/itinerary'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
-import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, UrgencyTag, formatTime, statusClass } from '../ui'
+import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, Stops, UrgencyTag, formatTime, statusClass } from '../ui'
 
 // Queue order, so the summary reads the same way as the list below it.
 const STATUSES: CaseStatus[] = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved']
@@ -134,13 +132,6 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       </details>
     </section>
   )
-}
-
-function Stops({ stops, label }: { stops: Stop[]; label: string }) {
-  if (!stops.length) return <p className="empty">No stops.</p>
-  return <ol aria-label={label}>
-    {stops.map((stop, i) => <li key={i}><strong>{stop.place}</strong>: <Local at={stop.start} /> to <Local at={stop.end} /> (Grand Canyon time)</li>)}
-  </ol>
 }
 
 function HistoryEntry({ item, from }: { item: CaseHistoryItem; from?: CaseHistoryItem }) {

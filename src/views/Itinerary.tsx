@@ -81,7 +81,7 @@ export default function Itinerary({ correcting, onCancel, onConfirmed, onAlready
   }
   return <section className="panel">
     <h2>Your Itinerary</h2>
-    {correcting && <p role="status">Correcting your Itinerary from <time dateTime={correcting.at}>{formatTime(correcting.at)}</time>. <button className="button" type="button" onClick={onCancel}>Cancel</button></p>}
+    {correcting && <p role="status">Correcting your Itinerary from <time dateTime={correcting.at}>{formatTime(correcting.at)}</time>. <button className="button" type="button" onClick={onCancel}>Discard correction</button></p>}
     <form className="itinerary" onSubmit={e => { e.preventDefault(); void extract() }}>
       <label>Paste your plans<textarea required maxLength={maxTextLength} rows={3} value={text} disabled={reading || saving}
         placeholder="November 1, 2026: visitor center 7 to 8, then Phantom Ranch 1 to 4" onChange={e => setText(e.target.value)} /></label>
