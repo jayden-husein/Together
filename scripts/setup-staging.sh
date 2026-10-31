@@ -200,7 +200,7 @@ finish() {
 
 run_wizard() {
 
-TOTAL_STAGES=6
+TOTAL_STAGES=7
 
 # Run from the repo root so .env and supabase/ resolve the same for everyone.
 cd "$(dirname "$0")/.."
@@ -286,6 +286,19 @@ step "Copy the publishable key (starts with sb_publishable_)."
 note "Copy the publishable key only, never the secret key."
 ask STAGING_SUPABASE_PUBLISHABLE_KEY "Paste the publishable key:"
 write_env STAGING_SUPABASE_PUBLISHABLE_KEY "$STAGING_SUPABASE_PUBLISHABLE_KEY"
+
+stage "Secret key"
+say "The demo-data seed needs this to create the demo Accounts on staging."
+open_url "https://supabase.com/dashboard/project/$STAGING_PROJECT_REF/settings/api-keys"
+step "If that page doesn't open, go to Project Settings → API Keys."
+step "Under Secret keys, reveal and copy the key (starts with sb_secret_)."
+warn "This key bypasses all access rules. It lives in .env only, never in the browser app or the repo."
+ask_secret STAGING_SUPABASE_SECRET_KEY "Paste the secret key:"
+if [[ "$STAGING_SUPABASE_SECRET_KEY" != sb_secret_* ]]; then
+  warn "Expected a key starting with sb_secret_."
+  exit 1
+fi
+write_env STAGING_SUPABASE_SECRET_KEY "$STAGING_SUPABASE_SECRET_KEY"
 
 stage "Check the connection"
 say "Asking staging which migrations it would apply (a dry run, nothing changes)…"
