@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { CircleMarker, MapContainer, TileLayer, Tooltip } from 'react-leaflet'
+import { CircleMarker, MapContainer, Tooltip } from 'react-leaflet'
 import { confirmedStops, maxStops, places, type Stop } from '../../supabase/functions/_shared/itinerary'
+import MapTiles from '../MapTiles'
 import { supabase } from '../lib/supabase'
 
-type Draft = Stop & { key: string }
+type Draft = Omit<Stop, 'place'> & { place: string } & { key: string }
 const blank = (): Draft => ({ key: crypto.randomUUID(), place: '', start: '', end: '' })
 
 export default function Itinerary() {
   const [stops, setStops] = useState<Draft[]>([])
   const [id, setId] = useState(() => crypto.randomUUID())
   const [saving, setSaving] = useState(false)
+  const [tilesFailed, setTilesFailed] = useState(false)
   const [message, setMessage] = useState('')
   function edit(next: Draft[]) {
     setStops(next)
@@ -47,12 +49,13 @@ export default function Itinerary() {
         </fieldset>
       })}
       {stops.some(s => s.place) && <MapContainer className="itinerary-map" center={[36.082, -112.115]} zoom={11}>
-        <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
+        <MapTiles onError={() => setTilesFailed(true)} />
         {stops.filter(s => s.place).map(s => {
-          const [lng, lat] = places[s.place]
+          const [lng, lat] = places[s.place as keyof typeof places]
           return <CircleMarker key={s.key} center={[lat, lng]} radius={7}><Tooltip>{s.place}</Tooltip></CircleMarker>
         })}
       </MapContainer>}
+      {tilesFailed && <p role="status">Map tiles could not load. Review your places in the stop list above.</p>}
       <div><button className="button" type="button" disabled={saving || stops.length >= maxStops} onClick={() => edit([...stops, blank()])}>Add stop</button>
         {stops.length > 0 && <button className="button" disabled={saving} type="submit">Confirm Itinerary</button>}</div>
     </form>

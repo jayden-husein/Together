@@ -141,7 +141,8 @@
   line-height: var(--leading-tight);
 }
 
-.itinerary, .itinerary fieldset, .itinerary label { display: grid; gap: var(--space-2); }
+.itinerary { display: grid; gap: var(--space-4); }
+.itinerary fieldset, .itinerary label { display: grid; gap: var(--space-2); }
 .itinerary fieldset { min-width: 0; }
 .itinerary input, .itinerary select { font: inherit; width: 100%; min-width: 0; }
 .itinerary-map { height: var(--map-min-height); }

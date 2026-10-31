@@ -21,10 +21,14 @@ const demoEmails = new Set([...Object.values(accounts), ...travelers.map(t => t.
 const { users } = check(await db.auth.admin.listUsers({ perPage: 1000 }))
 for (const user of users.filter((u) => demoEmails.has(u.email!))) check(await db.auth.admin.deleteUser(user.id))
 
+async function createAccount(email: string) {
+  const { user } = check(await db.auth.admin.createUser({ email, password, email_confirm: true }))
+  return user!.id
+}
+
 const ids = {} as Record<keyof typeof accounts, string>
 for (const [role, email] of Object.entries(accounts) as [keyof typeof accounts, string][]) {
-  const { user } = check(await db.auth.admin.createUser({ email, password, email_confirm: true }))
-  ids[role] = user!.id
+  ids[role] = await createAccount(email)
 }
 
 const demo = true
@@ -57,8 +61,8 @@ async function confirm(email: string, place: string, start: number) {
 }
 await confirm(accounts.maya, 'Phantom Ranch', now)
 for (const [i, { name, email }] of travelers.entries()) {
-  const { user } = check(await db.auth.admin.createUser({ email, password, email_confirm: true }))
-  check(await db.from('persons').insert({ account_id: user!.id, name, demo }))
+  const accountId = await createAccount(email)
+  check(await db.from('persons').insert({ account_id: accountId, name, demo }))
   // One group overlaps, one stays on the rim, one visited before the flood.
   await confirm(email, i % 3 === 1 ? 'Mather Point' : 'Phantom Ranch', i % 3 === 2 ? now - 24 * hour : now)
 }

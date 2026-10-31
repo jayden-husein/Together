@@ -9,7 +9,7 @@ export function match(personId: string, stops: Stop[], incidents: Incident[], ex
     if (existing.some(c => c.personId === personId && c.incidentId === incident.id)) return []
     const stop = stops.find(s => Date.parse(s.end) >= Date.parse(incident.starts_at)
       && (!incident.ends_at || Date.parse(s.start) <= Date.parse(incident.ends_at))
-      && inside(places[s.place], incident.area))
+      && inside([...places[s.place]], incident.area))
     return stop ? [{ personId, incidentId: incident.id, stop }] : []
   })
 }
