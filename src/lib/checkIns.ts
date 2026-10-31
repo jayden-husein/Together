@@ -10,26 +10,46 @@ export type QueueCase = { caseId: string; traveler: string; incident: string } &
 export type IndividualUpdate = {
   caseId: string
   traveler: string
-  update: { status: Exclude<CaseStatus['status'], 'unconfirmed'>; at: string }
+  update: ReturnType<typeof individualUpdateView>
 }
+
+export type ContactUpdate = IndividualUpdate
 
 type PollResult<T> = { data: T[] | undefined; error: string | null }
 
-type ReportRow = { id: string; created_at: string; original_text: string | null; body: { status: CheckInStatus } }
+type ReportRow = { case_id: string; id: string; created_at: string; original_text: string | null; body: { status: CheckInStatus } }
+
+const pageSize = 100
+
+async function readPages<T>(read: (from: number, to: number) => PromiseLike<{ data: T[] }>): Promise<T[]> {
+  const rows: T[] = []
+  for (let from = 0; ; from += pageSize) {
+    const { data } = await read(from, from + pageSize - 1)
+    rows.push(...data)
+    if (data.length < pageSize) return rows
+  }
+}
 
 async function myCheckIns(): Promise<CheckInRequest[]> {
-  const { data: requests } = await supabase.from('notifications').select('refers_to')
-    .eq('kind', 'check_in_request').throwOnError()
-  if (!requests.length) return []
-  const { data } = await supabase.from('cases')
-    .select('id, incidents!inner(name), reports(id, created_at, original_text, body)')
-    .in('id', requests.map(request => request.refers_to)).eq('reports.kind', 'check_in')
-    .order('created_at', { referencedTable: 'reports', ascending: false })
-    .returns<{ id: string; incidents: { name: string }; reports: ReportRow[] }[]>().throwOnError()
-  return data.map(row => ({
-    caseId: row.id, incident: row.incidents.name,
-    reports: row.reports.map(r => ({ id: r.id, at: r.created_at, description: r.original_text, status: r.body.status })),
-  }))
+  const requests = await readPages((from, to) => supabase.from('notifications').select('refers_to')
+    .eq('kind', 'check_in_request').order('created_at').order('id').range(from, to).throwOnError())
+  const ids = [...new Set(requests.map(request => request.refers_to))]
+  const cases = new Map<string, CheckInRequest>()
+  // Limit UUIDs in each URL independently of the Data API response page size.
+  const batchSize = 40
+  for (let start = 0; start < ids.length; start += batchSize) {
+    const batch = ids.slice(start, start + batchSize)
+    const { data } = await supabase.from('cases').select('id, incidents!inner(name)').in('id', batch)
+      .returns<{ id: string; incidents: { name: string } }[]>().throwOnError()
+    for (const row of data) cases.set(row.id, { caseId: row.id, incident: row.incidents.name, reports: [] })
+    const reports = await readPages((from, to) => supabase.from('reports')
+      .select('case_id, id, created_at, original_text, body').in('case_id', batch).eq('kind', 'check_in')
+      .order('created_at').order('id').range(from, to).returns<ReportRow[]>().throwOnError())
+    for (const row of reports.reverse()) {
+      cases.get(row.case_id)?.reports.push({ id: row.id, at: row.created_at, description: row.original_text, status: row.body.status })
+    }
+  }
+  return ids.flatMap(id => cases.get(id) ?? [])
 }
 
 function usePoll<T>(load: () => Promise<T[]>): PollResult<T> {
@@ -90,17 +110,11 @@ type QueueRow = {
 async function queue(): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
-  const rows: QueueRow[] = []
-  const pageSize = 100
-  for (let offset = 0; ; offset += pageSize) {
-    const { data } = await supabase.from('cases').select(
-      'id, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome)',
-    ).in('reports.kind', ['check_in', 'cant_reach']).eq('case_events.action', 'resolved')
-      .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
-      .order('created_at').order('id').range(offset, offset + pageSize - 1).returns<QueueRow[]>().throwOnError()
-    rows.push(...data)
-    if (data.length < pageSize) break
-  }
+  const rows = await readPages((from, to) => supabase.from('cases').select(
+    'id, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome)',
+  ).in('reports.kind', ['check_in', 'cant_reach']).eq('case_events.action', 'resolved')
+    .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
+    .order('created_at').order('id').range(from, to).returns<QueueRow[]>().throwOnError())
   return orderQueue(rows.map(row => {
     const history: CaseHistoryEntry[] = row.reports.map(report => ({
       at: report.created_at, outcome: null,
@@ -112,12 +126,15 @@ async function queue(): Promise<QueueCase[]> {
 }
 
 async function individualUpdates(): Promise<IndividualUpdate[]> {
-  const { data } = await supabase.rpc('contact_case_updates')
-    .select('case_id, person_name, status, at')
-    .in('entry_kind', ['check_in', 'cant_reach', 'resolved']).not('status', 'is', null)
-    .order('at', { ascending: false }).throwOnError()
-  if (!Array.isArray(data)) throw new Error('Expected a list of Individual Updates.')
-  return data.map(entry => ({ caseId: entry.case_id, traveler: entry.person_name, update: individualUpdateView(entry) }))
+  const data = await readPages(async (from, to) => {
+    const { data } = await supabase.rpc('contact_case_updates')
+      .select('case_id, person_name, status, at')
+      .in('entry_kind', ['check_in', 'cant_reach', 'resolved']).not('status', 'is', null)
+      .order('at').order('case_id').order('status').range(from, to).throwOnError()
+    if (!Array.isArray(data)) throw new Error('Expected a list of Individual Updates.')
+    return { data }
+  })
+  return data.reverse().map(entry => ({ caseId: entry.case_id, traveler: entry.person_name, update: individualUpdateView(entry) }))
 }
 
 export function useQueue() { return usePoll(queue) }

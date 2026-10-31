@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { expect, test, vi } from 'vitest'
+import { expect, expectTypeOf, test, vi } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
-import { useMyCheckIns, useQueue } from './checkIns'
+import { type ContactUpdate, type IndividualUpdate, useIndividualUpdates, useMyCheckIns, useQueue } from './checkIns'
 
 let status = 'safe'
 let queueFixture = false
@@ -20,10 +20,22 @@ vi.mock('./supabase', async () => {
       }))
       return Response.json(rows)
     }
-    if (path.endsWith('/notifications')) return Response.json([{ refers_to: 'case-1' }])
-    if (path.endsWith('/cases')) return Response.json([{ id: 'case-1', incidents: { name: 'Flood' },
-      reports: [{ id: 'report-1', body: { status }, original_text: null, created_at: '2026-10-31T06:00:00Z' }],
-    }])
+    const offset = Number(url.searchParams.get('offset'))
+    const limit = Number(url.searchParams.get('limit') ?? 1000)
+    const page = <T,>(rows: T[]) => Response.json(rows.slice(offset, offset + limit))
+    const ids = Array.from({ length: 1001 }, (_, i) => 'case-' + i)
+    const at = '2026-10-31T06:00:00Z'
+    if (path.endsWith('/notifications')) return page(ids.map(refers_to => ({ refers_to })))
+    if (path.endsWith('/rpc/contact_case_updates')) {
+      return page(ids.map(case_id => ({ case_id, person_name: 'Maya', status: 'safe', at })))
+    }
+    const filter = url.searchParams.get('id') ?? url.searchParams.get('case_id') ?? ''
+    if (filter.length > 2000) return Response.json({ message: 'URI too long' }, { status: 414 })
+    const requested = filter.slice(4, -1).replace(/"/g, '').split(',')
+    if (path.endsWith('/cases')) return page(requested.map(id => ({ id, incidents: { name: 'Flood' } })))
+    if (path.endsWith('/reports')) return page(requested.includes('case-0') ? ids.map(id => ({
+      id, case_id: 'case-0', body: { status }, original_text: null, created_at: at,
+    })) : [])
     throw new Error('Unexpected request')
   } } })
   return { supabase: client }
@@ -53,4 +65,22 @@ test('a Needs assistance Case on the next page appears first in the queue', asyn
     hook.unmount()
     queueFixture = false
   }
+})
+
+test('traveler can read requests and Report history beyond the API row cap', async () => {
+  const hook = renderHook(useMyCheckIns)
+  try {
+    await waitFor(() => expect(hook.result.current.data).toHaveLength(1001))
+    expect(hook.result.current.data?.find(c => c.caseId === 'case-0')?.reports).toHaveLength(1001)
+    expect(hook.result.current.data?.some(c => c.caseId === 'case-1000')).toBe(true)
+  } finally { hook.unmount() }
+})
+
+test('contact receives the full update history through the original screen contract', async () => {
+  expectTypeOf<ContactUpdate>().toEqualTypeOf<IndividualUpdate>()
+  const hook = renderHook(useIndividualUpdates)
+  try {
+    await waitFor(() => expect(hook.result.current.data).toHaveLength(1001))
+    expect(hook.result.current.data?.some(entry => entry.caseId === 'case-1000')).toBe(true)
+  } finally { hook.unmount() }
 })
