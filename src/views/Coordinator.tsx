@@ -1,3 +1,4 @@
+import PostGeneralUpdate from './PostGeneralUpdate'
 import PotentialIncidentReview, { DismissalLine } from './PotentialIncidentReview'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import type { Urgency } from '../lib/caseRules'
@@ -40,6 +41,7 @@ export default function Coordinator() {
           {dismissed.data.map(d => <li className="row" key={d.id}><span className="row-name">{d.name}</span><DismissalLine dismissal={d} /></li>)}
         </ul>
       </section> : null}
+      <PostGeneralUpdate />
       {error && <p role="alert">{error}</p>}
       {!data ? (
         !error && <p className="empty">Loading…</p>

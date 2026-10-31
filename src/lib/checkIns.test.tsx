@@ -69,7 +69,10 @@ vi.mock('./supabase', async () => {
     const filter = url.searchParams.get('id') ?? url.searchParams.get('case_id') ?? ''
     if (filter.length > 2000) return Response.json({ message: 'URI too long' }, { status: 414 })
     const requested = filter.slice(4, -1).replace(/"/g, '').split(',')
-    if (path.endsWith('/cases')) return page(requested.map(id => ({ id, incidents: { name: 'Flood' } })))
+    if (path.endsWith('/cases')) return page(requested.map(id => ({ id, incidents: {
+      id: 'incident-0', name: 'Flood', starts_at: at, ends_at: null,
+      area: { type: 'Polygon', coordinates: [[[-112.1, 36.095], [-112.085, 36.095], [-112.085, 36.112], [-112.1, 36.095]]] },
+    } })))
     if (path.endsWith('/reports')) return page(requested.includes('case-0') ? ids.map(id => ({
       id, case_id: 'case-0', body: { status }, original_text: null, created_at: at,
     })) : [])

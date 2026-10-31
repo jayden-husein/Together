@@ -1,0 +1,24 @@
+// Resources during a Grand Canyon Incident: hard-coded, fictional and labeled simulated. Coordinates are GeoJSON longitude/latitude.
+// None sits inside the demo flood area: a Resource says what help is there, never that a place is safe.
+export type Resource = {
+  name: string; kind: 'shelter' | 'water' | 'first_aid'; at: readonly [number, number]
+  availability: string; source: string; updatedAt: string
+}
+
+export const resources: Resource[] = [
+  { name: 'Bright Angel Lodge shelter', kind: 'shelter', at: [-112.1405, 36.0571], availability: 'Open, room for 80 people',
+    source: 'Simulated park operations feed', updatedAt: '2026-10-31T13:40:00Z' },
+  { name: 'Havasupai Gardens water station', kind: 'water', at: [-112.126, 36.079], availability: 'Drinking water, refilled hourly',
+    source: 'Simulated park operations feed', updatedAt: '2026-10-31T13:25:00Z' },
+  { name: 'Tipoff first-aid point', kind: 'first_aid', at: [-112.0839, 36.092], availability: 'Ranger with first-aid kit, staffed until dark',
+    source: 'Simulated ranger dispatch', updatedAt: '2026-10-31T13:50:00Z' },
+]
+
+export const RESOURCE_KIND: Record<Resource['kind'], string> = { shelter: 'Shelter', water: 'Water', first_aid: 'First aid' }
+
+// Straight-line distance in km. ponytail: flat-earth approximation, fine across one park; use haversine for wider areas.
+export const distanceKm = ([lng1, lat1]: readonly number[], [lng2, lat2]: readonly number[]) =>
+  Math.hypot((lng2 - lng1) * 111.32 * Math.cos((lat1 * Math.PI) / 180), (lat2 - lat1) * 110.57)
+
+export const nearestResource = (point: readonly number[]) =>
+  resources.reduce((best, r) => (distanceKm(point, r.at) < distanceKm(point, best.at) ? r : best))

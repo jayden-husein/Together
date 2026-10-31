@@ -1,12 +1,15 @@
 // Public contract for the three signed-in screens: the Check-in loop (#7) and the Coordinator Case workflow (#8).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { caseStatus, caseUrgency, compareTimes, individualUpdateView, orderQueue, type CaseHistoryEntry, type CaseStatus, type Outcome, type Urgency, type UrgencyEntry } from './caseRules'
-import { withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
+import { inForce, places, withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
+import { match } from '../../supabase/functions/_shared/match'
+import { nearestResource, type Resource } from '../../supabase/functions/_shared/resources'
 import { supabase } from './supabase'
 
 export type CheckInStatus = 'safe' | 'needs_assistance'
 export type CheckInReport = { id: string; status: CheckInStatus; description: string | null; at: string }
-export type CheckInRequest = { caseId: string; incident: string; reports: CheckInReport[] }
+// `nearestResource`: the Resource nearest the traveler's stop in the Incident, else nearest the Incident's area.
+export type CheckInRequest = { caseId: string; incident: string; nearestResource: Resource; reports: CheckInReport[] }
 // `at`: when the status was set (the latest Report or resolution), else when the Case opened.
 // `owner`: the Coordinator with the latest claim, if any; `ownedByMe`: that claim is the signed-in Account's.
 // `itineraryText`: what the traveler pasted for the Itinerary that opened the Case, if anything.
@@ -52,13 +55,20 @@ async function myCheckIns(): Promise<CheckInRequest[]> {
     .eq('kind', 'check_in_request').order('created_at').order('id').range(from, to).throwOnError())
   const ids = [...new Set(requests.map(request => request.refers_to))]
   const cases = new Map<string, CheckInRequest>()
+  // The same Match rule that opened the Case finds the stop: travelers can't read the Case event that names it.
+  const stops = ids.length ? inForce(await myItineraries()).flatMap(i => i.stops) : []
   // Limit UUIDs in each URL independently of the Data API response page size.
   const batchSize = 40
   for (let start = 0; start < ids.length; start += batchSize) {
     const batch = ids.slice(start, start + batchSize)
-    const { data } = await supabase.from('cases').select('id, incidents!inner(name)').in('id', batch)
-      .returns<{ id: string; incidents: { name: string } }[]>().throwOnError()
-    for (const row of data) cases.set(row.id, { caseId: row.id, incident: row.incidents.name, reports: [] })
+    const { data } = await supabase.from('cases').select('id, incidents!inner(id, name, starts_at, ends_at, area)').in('id', batch)
+      .returns<{ id: string; incidents: PublicIncident }[]>().throwOnError()
+    for (const { id, incidents: incident } of data) {
+      const stop = match('', stops, [incident])[0]?.stop
+      const ring = incident.area.coordinates[0]
+      const point = stop ? places[stop.place] : [0, 1].map(axis => ring.reduce((sum, p) => sum + p[axis], 0) / ring.length)
+      cases.set(id, { caseId: id, incident: incident.name, nearestResource: nearestResource(point), reports: [] })
+    }
     const reports = await readPages((from, to) => supabase.from('reports')
       .select('case_id, id, created_at, original_text, body').in('case_id', batch).eq('kind', 'check_in')
       .order('created_at').order('id').range(from, to).returns<ReportRow[]>().throwOnError())
@@ -404,3 +414,20 @@ async function publicIncidents() {
     .order('created_at', { ascending: false }).order('id').range(from, to).returns<PublicIncident[]>().throwOnError())
 }
 export function useIncidents() { return usePoll(publicIncidents) }
+
+// A General Update as anyone sees it: who posted it is never read here.
+export type GeneralUpdate = { id: string; body: string; created_at: string }
+export function useGeneralUpdates(incidentId: string | undefined) {
+  return usePoll(useCallback(async () => incidentId ? readPages((from, to) => supabase.from('general_updates').select('id,body,created_at')
+    .eq('incident_id', incidentId).order('created_at', { ascending: false }).order('id').range(from, to).returns<GeneralUpdate[]>().throwOnError()) : [], [incidentId]))
+}
+// Refused by the database unless the signed-in Account is a Coordinator.
+export async function postGeneralUpdate(incidentId: string, body: string) {
+  await supabase.from('general_updates').insert({ incident_id: incidentId, body }).throwOnError()
+}
+// The AI's draft for the Coordinator to edit. It is only text: posting is always postGeneralUpdate.
+export async function draftGeneralUpdate(incidentId: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('draft-general-update', { body: { incidentId } })
+  if (error) throw error
+  return data.draft
+}

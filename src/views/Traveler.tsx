@@ -2,6 +2,7 @@ import Itineraries from './Itineraries'
 import Itinerary from './Itinerary'
 import { useState } from 'react'
 import { type CheckInRequest, type ConfirmedItinerary, type CheckInStatus, submitCheckIn, useMyCheckIns, useMyItineraries } from '../lib/checkIns'
+import { RESOURCE_KIND } from '../../supabase/functions/_shared/resources'
 import { CheckInButtons, SourceLine, StatusBadge, statusClass } from '../ui'
 
 export default function Traveler() {
@@ -62,6 +63,8 @@ function Request({ request }: { request: CheckInRequest }) {
       <section className="panel panel-request" aria-label="Check-in Request">
         <h2>Check-in Request</h2>
         <p>{request.incident}: Coordinators are asking whether you're safe. Choose one.</p>
+        <p>Nearest Resource: <strong>{request.nearestResource.name}</strong> ({RESOURCE_KIND[request.nearestResource.kind]}, simulated). {request.nearestResource.availability}.</p>
+        <SourceLine source={`${request.nearestResource.source}, last updated`} at={request.nearestResource.updatedAt} />
         <CheckInButtons onCheckIn={status => (status === 'safe' ? send('safe') : setAsking(true))} />
         {asking && (
           <form className="describe" onSubmit={e => { e.preventDefault(); send('needs_assistance') }}>

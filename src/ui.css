@@ -204,4 +204,7 @@
   .incident-browser { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); grid-template-rows: auto minmax(var(--map-min-height), 1fr) auto; }
   .incident-browser > .view-header { grid-column: 1 / -1; }
   .incident-window { grid-column: 2; }
+  .general-updates { grid-column: 1; grid-row: 3; }
+  .resources { grid-column: 1 / -1; }
 }
+.resource-marker { background: var(--color-brand-fg); border: 2px solid var(--color-surface); border-radius: 50%; box-shadow: var(--shadow-card); }

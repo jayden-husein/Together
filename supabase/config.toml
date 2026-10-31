@@ -429,3 +429,7 @@ verify_jwt = false
 [functions.triage-check-in]
 # The handler verifies the session with Auth, including projects using asymmetric keys.
 verify_jwt = false
+
+[functions.draft-general-update]
+# The handler verifies the session with Auth, including projects using asymmetric keys.
+verify_jwt = false
