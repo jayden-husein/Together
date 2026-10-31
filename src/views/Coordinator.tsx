@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useId, useState } from 'react'
 import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, useCaseHistory, useQueue } from '../lib/checkIns'
-import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, UrgencyTag, statusClass } from '../ui'
+import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, UrgencyTag, formatTime, statusClass } from '../ui'
 
 // Queue order, so the summary reads the same way as the list below it.
 const STATUSES: CaseStatus[] = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved']
@@ -73,6 +73,8 @@ const OUTCOMES = Object.entries(OUTCOME_LABEL) as [Outcome, string][]
 
 function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
   const { data, error, reload } = useCaseHistory(c.caseId)
+  // Only Reports can be followed up, not other Case events.
+  const reports = data?.filter(item => item.entry === 'check_in' || item.entry === 'cant_reach') ?? []
   async function record(event: CoordinatorAction) {
     await recordCaseEvent(c.caseId, event)
     reload()
@@ -85,12 +87,13 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       <EventForm legend="Owner" submitLabel="Claim" note="none" onSubmit={() => record({ action: 'claimed' })}>
         <p>{c.owner ? `Claimed by ${c.owner}` : 'Unclaimed'}</p>
       </EventForm>
-      <EventForm legend="Contact Attempt" submitLabel="Record" note="optional"
+      <EventForm legend="Contact Attempt" submitLabel="Record" note="optional" reports={reports}
         choices={[['reached', 'Reached'], ['not_reached', 'Not reached']]}
-        onSubmit={(choice, note) => record({ action: 'contact_attempt', reached: choice === 'reached', ...(note && { note }) })} />
-      <EventForm legend="Note" submitLabel="Add note" note="required" onSubmit={(_, note) => record({ action: 'note', note })} />
-      <EventForm legend="Resolve" submitLabel="Resolve" note="optional" choices={OUTCOMES}
-        onSubmit={(outcome, note) => record({ action: 'resolved', outcome: outcome as Outcome, ...(note && { note }) })} />
+        onSubmit={(choice, extra) => record({ action: 'contact_attempt', reached: choice === 'reached', ...extra })} />
+      <EventForm legend="Note" submitLabel="Add note" note="required" reports={reports}
+        onSubmit={(_, { note, ...extra }) => record({ action: 'note', note: note!, ...extra })} />
+      <EventForm legend="Resolve" submitLabel="Resolve" note="optional" reports={reports} choices={OUTCOMES}
+        onSubmit={(outcome, extra) => record({ action: 'resolved', outcome: outcome as Outcome, ...extra })} />
       <h3>History</h3>
       {error && <p role="alert">{error}</p>}
       {!data ? (
@@ -106,15 +109,15 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
 }
 
 function HistoryEntry({ item, from }: { item: CaseHistoryItem; from?: CaseHistoryItem }) {
-  const label = item.entry === 'contact_attempt' ? `Contact Attempt: ${item.reached ? 'reached' : 'not reached'}`
-    : item.outcome ? `Resolved: ${OUTCOME_LABEL[item.outcome]}`
-    : ENTRY[item.entry]
+  const badge = item.entry === 'cant_reach' || item.entry === 'resolved' ? item.entry : item.status
   return (
     <li className="row">
       <div className="row-main">
-        <span className="row-name">{label}{item.urgency && <>: <UrgencyTag urgency={item.urgency} /></>}</span>
-        {item.status && <StatusBadge status={item.status} />}
-        {item.entry === 'cant_reach' && <StatusBadge status="cant_reach" />}
+        <span className="row-name">
+          {item.entry === 'contact_attempt' ? `Contact Attempt: ${item.reached ? 'Reached' : 'Not reached'}` : ENTRY[item.entry]}
+          {item.urgency && <>: <UrgencyTag urgency={item.urgency} /></>}
+        </span>
+        {badge && <StatusBadge status={badge} outcome={item.outcome ?? undefined} />}
       </div>
       {item.text && <p>{item.text}</p>}
       {from && <SourceLine source={`From the ${ENTRY[from.entry]}`} at={from.at} />}
@@ -123,18 +126,21 @@ function HistoryEntry({ item, from }: { item: CaseHistoryItem; from?: CaseHistor
   )
 }
 
-// One Coordinator action: at most one choice from `choices`, a note, and a submit button.
-function EventForm({ legend, submitLabel, choices = [], note, onSubmit, children }: {
+// One Coordinator action: at most one choice from `choices`, a note, the Report it follows up, and a submit button.
+// `onSubmit` gets the note and Report only when given.
+function EventForm({ legend, submitLabel, choices = [], note, reports = [], onSubmit, children }: {
   legend: string
   submitLabel: string
   choices?: [string, string][]
   note: 'none' | 'optional' | 'required'
-  onSubmit: (choice: string, note: string) => Promise<void>
+  reports?: CaseHistoryItem[]
+  onSubmit: (choice: string, extra: { note?: string; fromReport?: string }) => Promise<void>
   children?: ReactNode
 }) {
   const id = useId()
   const [choice, setChoice] = useState<string>()
   const [text, setText] = useState('')
+  const [fromReport, setFromReport] = useState('')
   const [sending, setSending] = useState(false)
   const [failure, setFailure] = useState<string>()
   const ready = (!choices.length || choice !== undefined) && (note !== 'required' || text.trim() !== '')
@@ -145,9 +151,10 @@ function EventForm({ legend, submitLabel, choices = [], note, onSubmit, children
     setSending(true)
     setFailure(undefined)
     try {
-      await onSubmit(choice ?? '', text.trim())
+      await onSubmit(choice ?? '', { ...(text.trim() && { note: text.trim() }), ...(fromReport && { fromReport }) })
       setChoice(undefined)
       setText('')
+      setFromReport('')
     } catch (err) {
       // Keep what they entered so they can try again.
       setFailure(`Couldn't save: ${err instanceof Error ? err.message : 'try again'}.`)
@@ -175,6 +182,15 @@ function EventForm({ legend, submitLabel, choices = [], note, onSubmit, children
           <>
             <label htmlFor={`${id}-note`}>Note</label>
             <textarea id={`${id}-note`} rows={2} value={text} onChange={e => setText(e.target.value)} />
+          </>
+        )}
+        {reports.length > 0 && (
+          <>
+            <label htmlFor={`${id}-report`}>From Report</label>
+            <select id={`${id}-report`} value={fromReport} onChange={e => setFromReport(e.target.value)}>
+              <option value="">None</option>
+              {reports.map(r => <option key={r.id} value={r.id}>{ENTRY[r.entry]} from {r.by}, {formatTime(r.at)}</option>)}
+            </select>
           </>
         )}
         <button type="submit" className="button" disabled={sending || !ready}>{submitLabel}</button>

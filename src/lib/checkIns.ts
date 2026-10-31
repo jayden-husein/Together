@@ -1,4 +1,4 @@
-// Public contract for the three signed-in screens in #7.
+// Public contract for the three signed-in screens: the Check-in loop (#7) and the Coordinator Case workflow (#8).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { caseStatus, compareTimes, individualUpdateView, orderQueue, type CaseHistoryEntry, type CaseStatus, type Outcome } from './caseRules'
 import { supabase } from './supabase'
@@ -93,6 +93,7 @@ function usePoll<T>(load: () => Promise<T[]>): Poll<T> {
       account = next
       generation++
       pending = false
+      again = false
       setResult({ data: undefined, error: null })
       queueMicrotask(poll)
     })
@@ -124,9 +125,11 @@ type QueueRow = {
   case_events: { action: 'claimed' | 'resolved'; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
 }
 
+// Looks up a Coordinator's name by Account id; one without a name, or no longer listed, is just "Coordinator".
 async function coordinatorNames() {
   const { data } = await supabase.from('coordinators').select('account_id, name').throwOnError()
-  return new Map(data.map(c => [c.account_id as string, (c.name as string | null) ?? 'Coordinator']))
+  const names = new Map(data.map(c => [c.account_id as string, c.name as string | null]))
+  return (accountId: string | null) => (accountId && names.get(accountId)) || 'Coordinator'
 }
 
 async function queue(): Promise<QueueCase[]> {
@@ -150,7 +153,7 @@ async function queue(): Promise<QueueCase[]> {
     // Case events come newest first, so the first one found is the latest.
     const at = status.status === 'resolved' ? resolutions[0]?.created_at : row.reports[0]?.created_at
     const claim = row.case_events.find(e => e.action === 'claimed')
-    const owner = claim ? names.get(claim.actor ?? '') ?? 'Coordinator' : null
+    const owner = claim ? names(claim.actor) : null
     return { caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, at: at ?? row.created_at, owner, ...status }
   }))
 }
@@ -220,7 +223,7 @@ async function caseHistory(caseId: string): Promise<CaseHistoryItem[]> {
       id: e.id, at: e.created_at, entry: e.action, text: e.note, status: null,
       reached: e.reached, outcome: e.outcome, urgency: e.urgency, fromReport: e.source_report_id,
       // No actor: Together itself, or the AI for a proposed Urgency.
-      by: e.actor ? names.get(e.actor) ?? 'Coordinator' : e.action === 'urgency_proposed' ? 'AI' : 'Together',
+      by: e.actor ? names(e.actor) : e.action === 'urgency_proposed' ? 'AI' : 'Together',
     })),
   ]
   return items.sort((a, b) => compareTimes(b.at, a.at))
@@ -231,11 +234,12 @@ export function useCaseHistory(caseId: string) {
 }
 
 // What a Coordinator can add to a Case. Each is a new history entry; nothing earlier changes.
+// `fromReport`: the id of one of the Case's Reports that the entry follows up.
 export type CoordinatorAction =
   | { action: 'claimed' }
-  | { action: 'contact_attempt'; reached: boolean; note?: string }
-  | { action: 'note'; note: string }
-  | { action: 'resolved'; outcome: Outcome; note?: string }
+  | { action: 'contact_attempt'; reached: boolean; note?: string; fromReport?: string }
+  | { action: 'note'; note: string; fromReport?: string }
+  | { action: 'resolved'; outcome: Outcome; note?: string; fromReport?: string }
 
 export async function recordCaseEvent(caseId: string, event: CoordinatorAction) {
   await supabase.rpc('record_case_event', {
@@ -243,6 +247,7 @@ export async function recordCaseEvent(caseId: string, event: CoordinatorAction) 
     p_note: 'note' in event ? event.note ?? null : null,
     p_reached: 'reached' in event ? event.reached : null,
     p_outcome: 'outcome' in event ? event.outcome : null,
+    p_source_report_id: 'fromReport' in event ? event.fromReport ?? null : null,
   }).throwOnError()
 }
 export function useIndividualUpdates() { return usePoll(individualUpdates) }

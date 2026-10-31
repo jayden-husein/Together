@@ -150,6 +150,16 @@ test('the Coordinator records a Contact Attempt and a note', async () => {
   await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'note', note: 'SAR found the camp empty' }))
 })
 
+test('a note can say which Report it follows up', async () => {
+  data.queue = [mayaCase]
+  data.history = [item({ id: 'r1', entry: 'check_in', by: 'Maya Chen', at: '2026-10-31T14:12:00Z', status: 'needs_assistance', text: 'Water rising' })]
+  const note = within(openMayaCase().getByRole('group', { name: 'Note' }))
+  fireEvent.change(note.getByLabelText('From Report'), { target: { value: 'r1' } })
+  fireEvent.change(note.getByLabelText('Note'), { target: { value: 'SAR reached the camp' } })
+  fireEvent.click(note.getByRole('button', { name: 'Add note' }))
+  await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'note', note: 'SAR reached the camp', fromReport: 'r1' }))
+})
+
 test('resolving needs exactly one outcome', async () => {
   data.queue = [mayaCase]
   data.history = []
@@ -175,7 +185,7 @@ test('the Case history says who did what, when and from which Report, with no wa
   const entries = history.getAllByRole('listitem')
   expect(entries.map(e => e.textContent)).toEqual([
     expect.stringMatching(/Resolved: Reached.*Dana Ortiz/),
-    expect.stringMatching(/Contact Attempt: not reached.*Voicemail.*Dana Ortiz/),
+    expect.stringMatching(/Contact Attempt: Not reached.*Voicemail.*Dana Ortiz/),
     expect.stringMatching(/Urgency proposed: Urgent.*From the Check-in.*AI/),
     expect.stringMatching(/Check-in.*Needs assistance.*Water rising.*Maya Chen/),
   ])
