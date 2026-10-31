@@ -125,14 +125,14 @@ type QueueRow = {
   incidents: { name: string }
   reports: { kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
   opening?: { note: string | null }[]
-  case_events: { action: 'claimed' | 'resolved'; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
+  case_events: { action: 'claimed' | 'released' | 'resolved'; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
 }
 
 // Looks up a Coordinator's name by Account id; one without a name, or no longer listed, is just "Coordinator".
 async function coordinatorNames() {
   const { data } = await supabase.from('coordinators').select('account_id, name').throwOnError()
   const names = new Map(data.map(c => [c.account_id as string, c.name as string | null]))
-  return (accountId: string | null) => (accountId && names.get(accountId)) || 'Coordinator'
+  return (accountId: string | null) => accountId ? names.get(accountId)?.trim() || `Coordinator #${accountId.slice(0, 8)}` : 'Coordinator'
 }
 
 async function queue(): Promise<QueueCase[]> {
@@ -140,9 +140,10 @@ async function queue(): Promise<QueueCase[]> {
   if (!coordinator) throw new Error('A Coordinator account is required.')
   const rows = await readPages((from, to) => supabase.from('cases').select(
     'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(action, actor, created_at, outcome), opening:case_events(note)',
-  ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'resolved']).eq('opening.action', 'opened')
+  ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'released', 'resolved']).eq('opening.action', 'opened')
     .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
     .order('created_at', { referencedTable: 'case_events', ascending: false })
+    .order('id', { referencedTable: 'case_events', ascending: false })
     .order('created_at').order('id').range(from, to).returns<QueueRow[]>().throwOnError())
   const names = await coordinatorNames()
   const { data: { session } } = await supabase.auth.getSession()
@@ -156,7 +157,8 @@ async function queue(): Promise<QueueCase[]> {
     const status = caseStatus(history)
     // Case events come newest first, so the first one found is the latest.
     const at = status.status === 'resolved' ? resolutions[0]?.created_at : row.reports[0]?.created_at
-    const claim = row.case_events.find(e => e.action === 'claimed')
+    const assignment = row.case_events.find(e => e.action !== 'resolved')
+    const claim = assignment?.action === 'claimed' ? assignment : undefined
     const owner = claim ? names(claim.actor) : null
     const ownedByMe = !!claim?.actor && claim.actor === session?.user.id
     return {
@@ -192,7 +194,7 @@ export async function markIndividualUpdatesRead(notificationIds: string[]) {
 export function useQueue() { return usePoll(queue) }
 
 type Urgency = 'immediate' | 'urgent' | 'can_wait'
-type CaseAction = 'opened' | 'check_in_request_sent' | 'urgency_proposed' | 'urgency_changed' | 'claimed' | 'contact_attempt' | 'note' | 'resolved'
+type CaseAction = 'opened' | 'check_in_request_sent' | 'urgency_proposed' | 'urgency_changed' | 'claimed' | 'released' | 'contact_attempt' | 'note' | 'resolved'
 
 // One entry of a Case's history for a Coordinator. `text`: the traveler's own words or the Coordinator's note.
 // `fromReport`: the id of the Report the entry came from.
@@ -244,7 +246,7 @@ export function useCaseHistory(caseId: string) {
 // What a Coordinator can add to a Case. Each is a new history entry; nothing earlier changes.
 // `fromReport`: the id of one of the Case's Reports that the entry follows up.
 export type CoordinatorAction =
-  | { action: 'claimed' }
+  | { action: 'claimed' | 'released' }
   | { action: 'contact_attempt'; reached: boolean; note: string; fromReport?: string }
   | { action: 'note'; note: string; fromReport?: string }
   | { action: 'resolved'; outcome: Outcome; note?: string; fromReport?: string }

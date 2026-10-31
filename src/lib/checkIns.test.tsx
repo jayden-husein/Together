@@ -21,6 +21,9 @@ vi.mock('./supabase', async () => {
         case_events: offset + i === 1 ? [
           { action: 'claimed', actor: 'acct-dana', created_at: '2026-10-31T05:20:00Z', outcome: null },
           { action: 'claimed', actor: 'acct-lee', created_at: '2026-10-31T05:10:00Z', outcome: null },
+        ] : offset + i === 100 ? [
+          { action: 'released', actor: 'acct-dana', created_at: '2026-10-31T05:20:00Z', outcome: null },
+          { action: 'claimed', actor: 'acct-dana', created_at: '2026-10-31T05:10:00Z', outcome: null },
         ] : [],
         reports: offset + i === 100 ? [{ kind: 'check_in', body: { status: 'needs_assistance' }, created_at: '2026-10-31T06:00:00Z' }] : [],
       }))
@@ -122,7 +125,7 @@ test('a Case history merges Reports and Case events, newest first, saying who di
   try {
     await waitFor(() => expect(hook.result.current.data).toHaveLength(5))
     expect(hook.result.current.data?.map(item => [item.entry, item.by])).toEqual([
-      ['resolved', 'Coordinator'], // an actor no longer listed still shows as a Coordinator
+      ['resolved', 'Coordinator #acct-gon'], // an actor no longer listed still shows as a Coordinator
       ['contact_attempt', 'Dana Ortiz'],
       ['urgency_proposed', 'AI'],
       ['check_in', 'Maya'],
