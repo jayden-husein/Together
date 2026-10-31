@@ -1,130 +1,38 @@
-/*
-  Together design tokens. Every color, type size, space and radius in the app comes from here.
-
-  - Components use these custom properties only: never a hex, px or rem literal in a component rule.
-    The one exception is @container/@media breakpoints, which can't read custom properties.
-    Missing a role? Add a token here (in both the light and dark blocks for colors), not a one-off value.
-  - Colors are named by role, not hue. Status and Urgency use the same five roles:
-      neutral  Unconfirmed, Can wait, Untriaged
-      danger   Needs assistance, Immediate
-      warning  Can't reach, Urgent
-      success  Safe
-      info     Resolved
-    Each role has -bg (badge fill) and -fg (text on that fill or on surface); danger and success also
-    have -solid for the Check-in buttons. Color never carries meaning alone: always pair it with the label.
-  - Brand (teal) marks Together itself: the logo, the current view, a Check-in Request. Never a status.
-  - Contour is the faint terrain lines behind every page; decoration only, never behind text it must not touch.
-  - src/tokens.test.ts checks every text/background pair against WCAG AA in both modes. Run it after
-    changing any color.
-  - Shared components live in src/ui.tsx: SimulationLabel, StatusBadge, UrgencyTag, CheckInButtons, SourceLine.
-*/
-
 :root {
-  color-scheme: light dark;
-
-  --color-bg: #f4f7fb;
-  --color-surface: #ffffff;
-  --color-border: #d3d8de;
-  --color-border-strong: #727c86;
-  --color-text: #182230;
-  --color-text-secondary: #4f5966;
-  --color-focus: #1e5ba1;
-
-  --color-primary-solid: #182230;
-  --color-on-primary: #ffffff;
-  --color-on-solid: #ffffff;
-  --color-brand-solid: #006363;
-  --color-on-brand: #ffffff;
-  --color-brand-bg: #dcf4f4;
-  --color-brand-fg: #00595a;
-  --color-contour: #cddade;
-  --color-card-edge: #e4e8ed;
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.05), 0 2px 8px rgb(16 24 40 / 0.06);
-
-  --color-neutral-bg: #e3e8ee;
-  --color-neutral-fg: #444e5b;
-  --color-danger-bg: #ffe7e4;
-  --color-danger-fg: #a92321;
-  --color-danger-solid: #be2323;
-  --color-warning-bg: #ffecc9;
-  --color-warning-fg: #824c11;
-  --color-success-bg: #dcf7e1;
-  --color-success-fg: #196632;
-  --color-success-solid: #137738;
-  --color-info-bg: #e2f0ff;
-  --color-info-fg: #1e5ba1;
-
-  /* Atkinson Hyperlegible Next: drawn for low-vision readers. System UI if it can't load. */
-  --font-body: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
-
-  /* Type scale: size / line-height pairs by role. */
-  --text-sm: 0.875rem;   /* captions, source and time lines */
-  --text-base: 1rem;     /* body, inputs (16px stops iOS input zoom) */
-  --text-lg: 1.25rem;    /* section headings, Check-in button labels */
-  --text-xl: 1.625rem;   /* page headings on a phone */
-  --text-2xl: 2.25rem;   /* page headings once there's room */
-  --leading-tight: 1.2;
-  --leading-body: 1.5;
-  --weight-bold: 700;
-  --tracking-heading: -0.01em;
-
-  /* Spacing: 4px steps. Gap between groups is at least twice the gap within one. */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-
-  --radius-sm: 0.25rem;  /* Urgency tags, Simulation label */
-  --radius-md: 0.5rem;   /* buttons, cards */
-  --radius-pill: 999px;  /* status badges */
-  --border-width: 1px;
-  --focus-width: 3px;
-  --focus-offset: 2px;
-
-  --tap-min: 4rem;       /* Check-in buttons: 64px, well above the 48px floor */
-  --stripe-width: 4px;   /* status stripe on a Case row */
-  --icon-size: 1.5rem;
-  --mark-size: 1.75rem;
-  --measure: 36rem;      /* max width of a single reading column */
-  --review-map-height: 22rem;
-  --map-min-height: 18rem;
-  --header-height: 3.5rem; /* the sticky app header's height */
+ color-scheme: dark;
+ --bg:#0E141B; --surface:#151D26; --surface-2:#1B2530; --border:#2A3744;
+ --text:#EAF0F6; --text-muted:#A9B6C3; --accent:#6FCFCB; --accent-ink:#072322;
+ --danger:#E5534B; --danger-bg:#3A1B1A; --warn:#F2B24C; --warn-bg:#35280F;
+ --ok:#4CC38A; --ok-bg:#12301F; --info:#6CA8F0; --info-bg:#14263D;
+ --color-bg:#0E141B; --color-surface:#151D26; --color-border:#2A3744; --color-border-strong:#66798A;
+ --color-text:#EAF0F6; --color-text-secondary:#A9B6C3; --color-focus:#6FCFCB;
+ --color-primary-solid:#6FCFCB; --color-on-primary:#072322; --color-on-solid:#071016;
+ --color-brand-solid:#6FCFCB; --color-on-brand:#072322; --color-brand-bg:#122E31; --color-brand-fg:#6FCFCB;
+ --color-contour:#526971; --color-card-edge:#2A3744;
+ --color-neutral-bg:#26313D; --color-neutral-fg:#BBC7D3;
+ --color-danger-bg:#3A1B1A; --color-danger-fg:#FFAAA3; --color-danger-solid:#E5534B;
+ --color-warning-bg:#35280F; --color-warning-fg:#F2B24C;
+ --color-success-bg:#12301F; --color-success-fg:#71D6A4; --color-success-solid:#4CC38A;
+ --color-info-bg:#14263D; --color-info-fg:#8FBCF5;
+ --font-body:'Atkinson Hyperlegible Next',system-ui,sans-serif;
+ --text-sm:.875rem; --text-base:1rem; --text-lg:1.375rem; --text-xl:2rem; --text-2xl:2rem;
+ --leading-tight:1.25; --leading-body:1.5; --weight-bold:600; --tracking-heading:-.01em;
+ --space-1:.25rem; --space-2:.5rem; --space-3:.75rem; --space-4:1rem; --space-6:1.5rem; --space-8:2rem; --space-12:3rem;
+ --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-pill:999px;
+ --border-width:1px; --focus-width:2px; --focus-offset:2px; --tap-min:40px; --stripe-width:3px; --icon-size:20px; --mark-size:28px;
+ --measure:720px; --review-map-height:300px; --map-min-height:240px; --header-height:60px;
+ --shadow-1:0 1px 2px rgba(0,0,0,.35); --shadow-2:0 8px 24px rgba(0,0,0,.35);
+ --shadow-card:var(--shadow-1),inset 0 1px 0 rgba(255,255,255,.04);
+ --surface-gradient:linear-gradient(180deg,#18222D,#141C25);
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #10171f;
-    --color-surface: #1b222c;
-    --color-border: #313942;
-    --color-border-strong: #737b86;
-    --color-text: #ebeff4;
-    --color-text-secondary: #b0b8c1;
-    --color-focus: #a3cffd;
-
-    --color-primary-solid: #ebeff4;
-    --color-on-primary: #10171f;
-    --color-on-solid: #ffffff;
-    --color-brand-solid: #6bcac9;
-    --color-on-brand: #031a1b;
-    --color-brand-bg: #113434;
-    --color-brand-fg: #8ddfde;
-    --color-contour: #1e282f;
-    --color-card-edge: #313942;
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
-
-    --color-neutral-bg: #2a313a;
-    --color-neutral-fg: #c7cfd7;
-    --color-danger-bg: #4e201e;
-    --color-danger-fg: #ffb4ad;
-    --color-danger-solid: #be2323;
-    --color-warning-bg: #402c12;
-    --color-warning-fg: #f4ca84;
-    --color-success-bg: #1a3520;
-    --color-success-fg: #95dfa4;
-    --color-success-solid: #137738;
-    --color-info-bg: #1e3149;
-    --color-info-fg: #a3cffd;
-  }
+:root[data-theme='light'] {
+ color-scheme:light;
+ --bg:#F4F7FB; --surface:#FFFFFF; --surface-2:#EDF2F7; --border:#CCD6DF; --text:#182230; --text-muted:#4F5966; --accent:#006363; --accent-ink:#FFFFFF;
+ --color-bg:#F4F7FB; --color-surface:#FFFFFF; --color-border:#CCD6DF; --color-border-strong:#727C86;
+ --color-text:#182230; --color-text-secondary:#4F5966; --color-focus:#006363;
+ --color-primary-solid:#006363; --color-on-primary:#FFFFFF; --color-on-solid:#FFFFFF;
+ --color-brand-solid:#006363; --color-on-brand:#FFFFFF; --color-brand-bg:#DCF4F4; --color-brand-fg:#00595A; --color-card-edge:#CCD6DF;
+ --color-neutral-bg:#E3E8EE; --color-neutral-fg:#444E5B; --color-danger-bg:#FFE7E4; --color-danger-fg:#A92321; --color-danger-solid:#BE2323;
+ --color-warning-bg:#FFECC9; --color-warning-fg:#824C11; --color-success-bg:#DCF7E1; --color-success-fg:#196632; --color-success-solid:#137738;
+ --color-info-bg:#E2F0FF; --color-info-fg:#1E5BA1; --surface-gradient:linear-gradient(180deg,#FFFFFF,#F7FAFC); --shadow-card:0 1px 4px rgba(16,24,40,.08);
 }

@@ -1,3 +1,4 @@
+import { copy, messages } from './copy'
 import type { Stop } from '../supabase/functions/_shared/itinerary'
 import type { Resource } from '../supabase/functions/_shared/resources'
 import type { Outcome } from './lib/caseRules'
@@ -11,32 +12,30 @@ export type CheckInStatus = Extract<CaseStatus, 'safe' | 'needs_assistance'>
 export type { Outcome }
 
 const STATUS_LABEL: Record<CaseStatus, string> = {
-  unconfirmed: 'Unconfirmed',
-  cant_reach: "Can't reach",
-  needs_assistance: 'Needs assistance',
-  safe: 'Safe',
-  resolved: 'Resolved',
+  unconfirmed: copy.unconfirmed,
+  cant_reach: copy.cant_reach,
+  needs_assistance: copy.needs_assistance_2,
+  safe: copy.safe_2,
+  resolved: copy.resolved_2,
 }
 
 export const OUTCOME_LABEL: Record<Outcome, string> = {
-  reached: 'Reached',
-  assistance_provided: 'Assistance provided',
-  not_in_area: 'Not in area',
+  reached: copy.reached,
+  assistance_provided: copy.assistance_provided,
+  not_in_area: copy.not_in_area,
 }
 
 export const URGENCY_LABEL: Record<Urgency, string> = {
-  immediate: 'Immediate',
-  urgent: 'Urgent',
-  can_wait: 'Can wait',
-  untriaged: 'Untriaged',
+  immediate: copy.immediate,
+  urgent: copy.urgent,
+  can_wait: copy.can_wait,
+  untriaged: copy.untriaged,
 }
 
 /** Marks synthetic data. Put it wherever demo data shows; the app shell already shows one in the header. */
 export function SimulationLabel() {
   return (
-    <span className="simulation" title="Everything shown is synthetic demo data">
-      Simulation
-    </span>
+    <span className="simulation" title={copy.everything_shown_is_synthetic_demo_data}>{copy.simulation}</span>
   )
 }
 
@@ -46,29 +45,25 @@ export const statusClass = (status: CaseStatus) => `status-${status}`
 /** A resolved Case's badge names its outcome when given one. */
 export function StatusBadge({ status, outcome }: { status: CaseStatus; outcome?: Outcome }) {
   const label = STATUS_LABEL[status]
-  return <span className={`badge ${statusClass(status)}`}>{outcome ? `${label}: ${OUTCOME_LABEL[outcome]}` : label}</span>
+  return <span className={`badge ${statusClass(status)}`}>{outcome ? messages.text_12(label,OUTCOME_LABEL[outcome]) : label}</span>
 }
 
 export function UrgencyTag({ urgency }: { urgency: Urgency }) {
   return <span className={`tag tag-${urgency}`}>{URGENCY_LABEL[urgency]}</span>
 }
 
-export function CheckInButtons({ onCheckIn }: { onCheckIn: (status: CheckInStatus) => void }) {
+export function CheckInButtons({ onCheckIn, disabled = false }: { disabled?: boolean; onCheckIn: (status: CheckInStatus) => void }) {
   return (
-    <div className="check-in" role="group" aria-label="Check in">
-      <button type="button" className="check-in-button check-in-safe" onClick={() => onCheckIn('safe')}>
+    <div className="check-in" role="group" aria-label={copy.check_in}>
+      <button type="button" disabled={disabled} className="check-in-button check-in-safe" onClick={() => onCheckIn('safe')}>
         <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 12.5l4.5 4.5L19 7.5" />
-        </svg>
-        Safe
-      </button>
-      <button type="button" className="check-in-button check-in-needs-assistance" onClick={() => onCheckIn('needs_assistance')}>
+        </svg>{copy.safe}</button>
+      <button type="button" disabled={disabled} className="check-in-button check-in-needs-assistance" onClick={() => onCheckIn('needs_assistance')}>
         <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7.5v5.5M12 16.5v.01" />
-        </svg>
-        Needs assistance
-      </button>
+        </svg>{copy.needs_assistance}</button>
     </div>
   )
 }
@@ -92,7 +87,7 @@ export function formatTime(at: string) {
 export function SourceLine({ source, at }: { source: string; at: string }) {
   return (
     <p className="source-line">
-      {source}, <time dateTime={at}>{formatTime(at)}</time>
+      {source}{copy.text_3}<time dateTime={at}>{formatTime(at)}</time>
     </p>
   )
 }
@@ -106,8 +101,8 @@ export const Local = ({ at }: { at: string }) => <time dateTime={at}>{localTime.
 
 /** An Itinerary's stops, in Grand Canyon time. */
 export function Stops({ stops, label }: { stops: Stop[]; label?: string }) {
-  if (!stops.length) return <p className="empty">No stops.</p>
+  if (!stops.length) return <p className="empty">{copy.no_stops}</p>
   return <ol aria-label={label}>
-    {stops.map((stop, i) => <li key={i}><strong>{stop.place}</strong>: <Local at={stop.start} /> to <Local at={stop.end} /> (Grand Canyon time)</li>)}
+    {stops.map((stop, i) => <li key={i}><strong>{stop.place}</strong>{copy.text_4}<Local at={stop.start} />{copy.to}<Local at={stop.end} />{copy.mst_grand_canyon_local_2}</li>)}
   </ol>
 }

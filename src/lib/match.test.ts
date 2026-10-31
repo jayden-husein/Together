@@ -39,3 +39,7 @@ it('rejects past starts and accepts the current instant at the earliest', () => 
 it('requires exactly four digits in both years', () => {
   expect(() => confirmedStops([{ ...stop, start: '111111-01-01T10:00:00Z', end: '111111-01-01T11:00:00Z' }])).toThrow()
 })
+
+it('a Phantom Ranch stop ending at 5:11 MST does not overlap an incident starting at 5:42 MST', () => {
+  expect(match('maya', [{ place: 'Phantom Ranch', start: '2026-10-31T04:11:00-07:00', end: '2026-10-31T05:11:00-07:00' }], [{ ...incident, starts_at: '2026-10-31T05:42:00-07:00', ends_at: null }])).toEqual([])
+})

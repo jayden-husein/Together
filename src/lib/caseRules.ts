@@ -23,19 +23,18 @@ export function compareTimes(a: string, b: string) {
   return fraction(a).localeCompare(fraction(b))
 }
 
-// Resolved wins, and a later resolution corrects an earlier one; otherwise the latest Check-in
-// or Can't-reach report; otherwise Unconfirmed, so silence is never taken for Safe.
+// One precedence rule for every view: latest status-bearing event wins.
 export function caseStatus(history: CaseHistoryEntry[]): CaseStatus {
-  let resolved: CaseHistoryEntry | undefined
-  for (const e of history) {
-    if (e.status === 'resolved' && e.outcome && (!resolved || compareTimes(e.at, resolved.at) >= 0)) resolved = e
-  }
-  if (resolved) return { status: 'resolved', outcome: resolved.outcome! }
-  let latest: { at: string; status: 'safe' | 'needs_assistance' | 'cant_reach' } | undefined
-  for (const { at, status } of history) {
-    if (status && status !== 'resolved' && (!latest || compareTimes(at, latest.at) >= 0)) latest = { at, status }
-  }
-  return { status: latest?.status ?? 'unconfirmed' }
+  const latest = history.filter(e => e.status && (e.status !== 'resolved' || e.outcome))
+    .sort((a, b) => compareTimes(b.at, a.at))[0]
+  if (latest?.status === 'resolved' && latest.outcome) return { status: 'resolved', outcome: latest.outcome }
+  return { status: latest?.status && latest.status !== 'resolved' ? latest.status : 'unconfirmed' }
+}
+
+export function statusConflict(history: CaseHistoryEntry[]) {
+  const latest = history.filter(e => e.status).sort((a, b) => compareTimes(b.at, a.at))
+  const safe = latest.find(e => e.status === 'safe')
+  return latest[0]?.status === 'cant_reach' && safe ? { safeAt: safe.at, reportAt: latest[0].at } : undefined
 }
 
 // An Urgency entry of a Case's history. `note`: the AI's quote from the traveler, on a proposal.
@@ -66,7 +65,7 @@ export function orderQueue<T extends { status: CaseStatus['status']; urgency?: U
   return [...cases].sort((a, b) => queuePriority[a.status] - queuePriority[b.status] || urgency(a) - urgency(b))
 }
 
-type StatusUpdate = { status: NonNullable<CaseHistoryEntry['status']>; at: string; outcome?: Outcome }
+type StatusUpdate = { status: NonNullable<CaseHistoryEntry['status']> | 'unconfirmed'; at: string; outcome?: Outcome }
 type UrgencyUpdate = { urgency: Urgency; at: string }
 
 // Status, time and a resolution's outcome, or an Urgency and time. Never notes, the AI's quote or the traveler's own words.

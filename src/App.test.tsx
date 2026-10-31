@@ -24,9 +24,9 @@ afterEach(() => {
 })
 
 test.each([
-  ['#/traveler', 'Sign in'],
-  ['#/contact', 'Sign in'],
-  ['#/coordinator', 'Sign in'],
+  ['#/traveler', 'Welcome back'],
+  ['#/contact', 'Welcome back'],
+  ['#/coordinator', 'Welcome back'],
   ['', 'Incident'],
 ])('signed out, route %s shows %s with the Simulation label', async (hash, heading) => {
   window.location.hash = hash
@@ -41,7 +41,7 @@ test('following a nav link switches the view', async () => {
     window.location.hash = '#/coordinator'
     window.dispatchEvent(new HashChangeEvent('hashchange'))
   })
-  expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back' })).toBeTruthy()
 })
 
 test('public incident page shows the Simulation label and OpenStreetMap attribution', () => {
@@ -133,12 +133,21 @@ test('Coordinator statistics use Incident IDs and resolution requires confirmati
   expect(within(controls).getByRole('list', { name: 'Incident Case statistics' }).textContent).toContain('1Unconfirmed')
   fireEvent.click(screen.getByRole('button', { name: 'Resolve Incident' }))
   expect(resolve).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText('Reason'),{target:{value:'All cases reviewed'}})
   fireEvent.click(screen.getByRole('button', { name: 'Confirm resolution' }))
-  await waitFor(() => expect(resolve).toHaveBeenCalledWith('one'))
+  await waitFor(() => expect(resolve).toHaveBeenCalledWith('one','All cases reviewed','assistance_provided'))
 })
 
 test('public visitors see no Coordinator controls or Case statistics', () => {
   incident.data = [flood('one', 'Flood')]
   render(<App />)
   expect(screen.queryByRole('region', { name: 'Coordinator Incident controls' })).toBeNull()
+})
+
+test('unknown routes have a friendly 404 and retain the public sign-in control', async () => {
+ window.location.hash='#/does-not-exist'
+ render(<App />)
+ expect(await screen.findByRole('heading',{name:"We can't find that page"})).toBeTruthy()
+ expect(screen.getByRole('link',{name:'Go to Incident page'}).getAttribute('href')).toBe('#/')
+ expect(screen.getByRole('link',{name:'Sign in'})).toBeTruthy()
 })

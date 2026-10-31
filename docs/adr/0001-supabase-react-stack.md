@@ -4,5 +4,5 @@ The app is React + Vite + TypeScript with Leaflet for the map, on Supabase (Post
 
 ## Consequences
 
-- Shared state refreshes by polling every few seconds rather than Supabase Realtime. That's acceptable for a demo; it's a documented limitation, not a design.
+- Shared state now refreshes through Supabase Realtime, with polling every few seconds as a fallback. This replaces the original polling-only limitation under the October 31 polish plan; row-level security still controls private delivery.
 - The AI API key never reaches the browser.

@@ -49,7 +49,7 @@ function isDate(value: unknown): value is string {
 const isTime = (value: unknown): value is string => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
 
 // Longest General Update the database accepts.
-export const maxUpdateLength = 1000
+export const maxUpdateLength = 500
 
 // A drafted General Update, or null. It reaches only the Coordinator, who edits it before anyone else sees it.
 export function draftedUpdate(reply: unknown): string | null {

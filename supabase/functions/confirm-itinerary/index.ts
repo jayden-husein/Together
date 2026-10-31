@@ -12,6 +12,8 @@ Deno.serve(async request => {
     const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
     const user = await signedInUser(db, request)
     if (!user) return reply(401, { message: 'Sign in to confirm.' })
+    const { data: coordinator } = await db.from('coordinators').select('account_id').eq('account_id', user.id).maybeSingle().throwOnError()
+    if (coordinator) return reply(403, { message: 'Coordinator accounts cannot submit itineraries.' })
     const body = await request.json().catch(() => null)
     if (typeof body?.id !== 'string' || !uuid.test(body.id)) return reply(400, { message: 'Invalid confirmation id.' })
     const originalText = body.originalText ?? null

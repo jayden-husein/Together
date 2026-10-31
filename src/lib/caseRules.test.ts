@@ -13,10 +13,10 @@ test('the latest Check-in or Can\'t-reach report sets the status', () => {
   expect(caseStatus([safe, checkIn, cantReach])).toEqual({ status: 'safe' })
 })
 
-test('Resolved with its outcome wins over everything, even a later Check-in', () => {
+test('a later traveler Check-in overrides an earlier resolution', () => {
   const resolved = { at: '2026-11-01T14:00:00Z', status: 'resolved', outcome: 'reached' } as const
   const laterCheckIn = { at: '2026-11-01T14:05:00+00:00', status: 'needs_assistance', outcome: null } as const
-  expect(caseStatus([resolved, laterCheckIn])).toEqual({ status: 'resolved', outcome: 'reached' })
+  expect(caseStatus([resolved, laterCheckIn])).toEqual({ status: 'needs_assistance' })
 })
 
 test('queue prioritizes assistance, then unreachable, unanswered, safe and resolved Cases', () => {
@@ -95,4 +95,11 @@ test("a Check-in after a Can't-reach report replaces Can't reach", () => {
   const checkIn = { at: '2026-11-01T13:40:00Z', status: 'needs_assistance', outcome: null } as const
   expect(caseStatus([cantReach])).toEqual({ status: 'cant_reach' })
   expect(caseStatus([checkIn, cantReach])).toEqual({ status: 'needs_assistance' })
+})
+
+test('a reached coordinator attempt is a dated Safe event, and a newer report wins', () => {
+ const reached={status:'safe',outcome:null,at:'2026-10-31T14:00:00Z'} as const
+ const report={status:'cant_reach',outcome:null,at:'2026-10-31T14:01:00Z'} as const
+ expect(caseStatus([reached,report])).toEqual({status:'cant_reach'})
+ expect(caseStatus([report,{...reached,at:'2026-10-31T14:02:00Z'}])).toEqual({status:'safe'})
 })

@@ -19,6 +19,7 @@ vi.mock('./supabase', async () => {
         area: { type: 'Polygon', coordinates: [] },
       })).slice(offset, offset + limit))
     }
+    if (path.endsWith('/report_cancellations') || path.endsWith('/rpc/my_open_contact_reports')) return Response.json([])
     if (path.endsWith('/rpc/is_coordinator')) return Response.json(true)
     if (path.endsWith('/coordinators')) return Response.json([{ account_id: 'acct-dana', name: 'Dana Ortiz' }])
     if (queueFixture && path.endsWith('/cases')) {
