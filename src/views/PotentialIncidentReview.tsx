@@ -2,18 +2,20 @@ import { useState, type FormEvent } from 'react'
 import { MapContainer, Polygon } from 'react-leaflet'
 import type { LatLngTuple } from 'leaflet'
 import MapTiles from '../MapTiles'
-import { verifyIncident, type PotentialIncident } from '../lib/checkIns'
+import { dismissPotentialIncident, verifyIncident, type PotentialIncident } from '../lib/checkIns'
+import { SourceLine, formatTime } from '../ui'
 
 function localTime(iso: string) {
   const date = new Date(iso)
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, -1)
 }
 
-export default function PotentialIncidentReview({ draft, onVerify }: { draft: PotentialIncident; onVerify: () => void }) {
+export default function PotentialIncidentReview({ draft, onDecided }: { draft: PotentialIncident; onDecided: () => void }) {
   const [start, setStart] = useState(localTime(draft.starts_at))
   const [end, setEnd] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [reason, setReason] = useState('')
   const [tileError, setTileError] = useState(false)
   const rings = draft.area.coordinates.map(ring => ring.map(([lng, lat]): LatLngTuple => [lat, lng]))
   async function verify(event: FormEvent) {
@@ -24,16 +26,32 @@ export default function PotentialIncidentReview({ draft, onVerify }: { draft: Po
     setError('')
     try {
       await verifyIncident(draft.id, start === localTime(draft.starts_at) ? draft.starts_at : new Date(start).toISOString(), end ? new Date(end).toISOString() : null)
-      onVerify()
+      onDecided()
     } catch { setError('Could not verify the Incident. Try again.') }
+    finally { setBusy(false) }
+  }
+  async function dismiss(event: FormEvent) {
+    event.preventDefault()
+    if (busy || !reason.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      await dismissPotentialIncident(draft.id, reason.trim())
+      onDecided()
+    } catch { setError('Could not dismiss the Potential incident. Try again.') }
     finally { setBusy(false) }
   }
   return <section className="panel potential-review">
     <h2>Potential incident</h2>
+    {draft.earlier && <div role="note">
+      <p>An earlier Potential incident from the same source was dismissed: <q>{draft.earlier.dismissal_reason}</q></p>
+      <SourceLine source={draft.earlier.dismisser?.name ?? 'A Coordinator'} at={draft.earlier.dismissed_at} />
+    </div>}
     <h3>{draft.name}</h3>
+    <p><strong>{draft.corroborated ? 'Corroborated' : 'Single source'}</strong></p>
     <p>{draft.fallback ? 'Pre-written summary' : 'AI summary'}</p>
     <p>{draft.summary}</p>
-    <ul>{draft.sources.map(source => <li key={source.name}>{source.name} <q>{source.quote}</q>
+    <ul>{draft.sources.map(source => <li key={source.name}>{source.name}, <time dateTime={source.at}>{formatTime(source.at)}</time> <q>{source.quote}</q>
       <details><summary>Full reading</summary>{source.text}</details></li>)}</ul>
     <h3>Weather warning area</h3>
     <MapContainer className="review-map" bounds={rings[0]} scrollWheelZoom={false}>
@@ -46,7 +64,13 @@ export default function PotentialIncidentReview({ draft, onVerify }: { draft: Po
       <label>End (optional) <input type="datetime-local" step="any" value={end} onChange={e => setEnd(e.target.value)} /></label>
       <p>Verification sends a Check-in Request to each traveler with a matching Itinerary.</p>
       <button className="button" disabled={busy}>{busy ? 'Verifying…' : 'Verify Incident'}</button>
-      {error && <p role="alert">{error}</p>}
     </fieldset></form>
+    <form className="case-action" onSubmit={dismiss}><fieldset>
+      <legend>Dismiss</legend>
+      <label>Reason <textarea required rows={2} value={reason} onChange={e => setReason(e.target.value)} /></label>
+      <p>A new reading from these sources will raise a new Potential incident showing this dismissal.</p>
+      <button className="button" disabled={busy || !reason.trim()}>Dismiss</button>
+    </fieldset></form>
+    {error && <p role="alert">{error}</p>}
   </section>
 }

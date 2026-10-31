@@ -1,12 +1,12 @@
 import OpenAI from 'openai'
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0'
-import { draftFlood, floodReadings } from '../_shared/flood.ts'
+import { assessReadings, draftFlood, fixtureReading, floodReadings, type Reading } from '../_shared/flood.ts'
 import { match } from '../_shared/match.ts'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type' }
 const reply = (status: number, message: string) => Response.json({ message }, { headers, status })
 
-async function summarize(readings: ReturnType<typeof floodReadings>) {
+async function summarize(readings: Reading[]) {
   // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API; draftFlood checks every quote it returns.
   const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 15_000, maxRetries: 0 })
   const completion = await dartmouth.chat.completions.create({
@@ -18,7 +18,7 @@ async function summarize(readings: ReturnType<typeof floodReadings>) {
     } } },
     messages: [
       { role: 'system', content: 'Summarize these synthetic flood readings for a Coordinator. Return only JSON with a short summary string and quotes, an array of one exact nonempty excerpt per reading in the supplied order.' },
-      { role: 'user', content: JSON.stringify([readings.gauge, readings.warning, readings.news].map(({ name, text }) => ({ name, text }))) },
+      { role: 'user', content: JSON.stringify(readings.map(({ name, text }) => ({ name, text }))) },
     ],
   })
   const choice = completion.choices[0]
@@ -27,8 +27,9 @@ async function summarize(readings: ReturnType<typeof floodReadings>) {
 }
 
 async function verify(db: SupabaseClient, account: string, id: string, start: string, end: string | null) {
-  const { data: draft } = await db.from('potential_incidents').select('area,incident_id').eq('id', id).single().throwOnError()
+  const { data: draft } = await db.from('potential_incidents').select('area,incident_id,dismissed_at').eq('id', id).single().throwOnError()
   if (draft.incident_id) return reply(200, 'Incident already verified.')
+  if (draft.dismissed_at) return reply(409, 'This Potential incident was dismissed.')
   const incident = { id, area: draft.area, starts_at: start, ends_at: end }
   for (let attempt = 0; attempt < 3; attempt++) {
     const matches = []
@@ -47,6 +48,7 @@ async function verify(db: SupabaseClient, account: string, id: string, start: st
     const { error } = await db.rpc('verify_potential_incident', { p_id: id, p_account: account,
       p_start: start, p_end: end, p_matches: matches, p_report_count: count })
     if (!error) return reply(200, 'Incident verified.')
+    if (error.code === 'P0409') return reply(409, 'This Potential incident was dismissed.')
     if (error.code !== '40001') throw error
   }
   return reply(409, 'Itineraries changed. Try verifying again.')
@@ -65,18 +67,21 @@ Deno.serve(async request => {
     if (!coordinator) return reply(403, 'A Coordinator account is required.')
     const body = await request.json().catch(() => null)
     if (body?.action === 'ingest' && coordinator.demo) {
-      // This feed accepts only the three synthetic fixture readings.
-      const readings = floodReadings()
-      const packet = body.readings
-      if (!packet || !(['gauge', 'warning', 'news'] as const).every(key =>
-        packet[key]?.name === readings[key].name && packet[key].text === readings[key].text) ||
-        packet.warning.area?.type !== 'Polygon' ||
-        JSON.stringify(packet.warning.area.coordinates) !== JSON.stringify(readings.warning.area.coordinates)) {
+      // This feed accepts only the synthetic fixture readings.
+      const readings: (Reading | null)[] = Array.isArray(body.readings) ? body.readings.map(fixtureReading) : []
+      if (!readings.length || readings.length > Object.keys(floodReadings()).length || !readings.every(Boolean) || !readings.some(r => r!.area)) {
         return reply(400, 'Unknown source packet.')
       }
+      const packet = readings as Reading[]
+      // ponytail: reads every earlier Potential incident and two simultaneous deliveries can both raise one;
+      // add a unique key per reading if the feed becomes real.
+      const { data: earlier } = await db.from('potential_incidents').select('id,sources,dismissed_at').throwOnError()
+      const assessment = assessReadings(packet, earlier.map(e => ({ id: e.id, sources: e.sources, dismissedAt: e.dismissed_at })))
+      if (!assessment.raise) return Response.json({ id: null }, { headers })
       const draft = await draftFlood(packet, () => summarize(packet))
       const { data } = await db.from('potential_incidents').insert({ ...draft, name: 'Flash flood at Phantom Ranch',
-        starts_at: new Date(Date.now() - 30 * 60000).toISOString(), demo: true }).select('id').single().throwOnError()
+        starts_at: packet.map(r => r.at).sort()[0], corroborated: assessment.corroborated,
+        earlier_dismissal_id: assessment.earlierDismissal, demo: true }).select('id').single().throwOnError()
       return Response.json(data, { headers })
     }
     if (body?.action !== 'verify' || typeof body.id !== 'string') return reply(400, 'Invalid review.')

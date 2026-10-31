@@ -31,7 +31,7 @@ export default function Coordinator() {
         </ul>
       </header>
       {pending.error && <p role="alert">{pending.error}</p>}
-      {pending.data?.map(draft => <PotentialIncidentReview key={draft.id} draft={draft} onVerify={() => { pending.reload(); reload() }} />)}
+      {pending.data?.map(draft => <PotentialIncidentReview key={draft.id} draft={draft} onDecided={() => { pending.reload(); reload() }} />)}
       {error && <p role="alert">{error}</p>}
       {!data ? (
         !error && <p className="empty">Loading…</p>

@@ -19,7 +19,7 @@ async function rows(client: SupabaseClient, table: string) {
 const anon = createClient(url, publishableKey, { auth: { persistSession: false } })
 const coordinator = await signIn(accounts.coordinator)
 const { data: pending } = await coordinator.from('potential_incidents').select('id, starts_at')
-  .eq('demo', true).is('incident_id', null).maybeSingle().throwOnError()
+  .eq('demo', true).is('incident_id', null).is('dismissed_at', null).maybeSingle().throwOnError()
 if (pending) {
   if (process.argv[2] !== 'staging' || !process.argv.includes('--verify')) {
     throw new Error('Verify the pending demo Incident in the Coordinator view first, or use staging --verify.')
@@ -30,6 +30,10 @@ if (pending) {
   const { data: notices } = await coordinator.from('notifications').select('id').eq('kind', 'potential_incident')
     .eq('refers_to', pending.id).throwOnError()
   expect(notices.length === 1, 'Coordinator received the Potential incident Notification')
+  const { data: dismissed } = await coordinator.from('potential_incidents').select('id')
+    .eq('demo', true).not('dismissed_at', 'is', null).limit(1).single().throwOnError()
+  const dismissedBody = { action: 'verify', id: dismissed.id, start: pending.starts_at, end: null }
+  expect((await coordinator.functions.invoke('potential-incident', { body: dismissedBody })).error !== null, 'a dismissed Potential incident cannot be verified')
   const body = { action: 'verify', id: pending.id, start: pending.starts_at, end: null }
   const traveler = await signIn(accounts.maya)
   expect((await traveler.functions.invoke('potential-incident', { body })).error !== null, 'Traveler cannot verify')

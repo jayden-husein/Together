@@ -65,5 +65,10 @@ for (const [i, { name, email }] of travelers.entries()) {
   await confirm(email, i % 3 === 1 ? 'Mather Point' : 'Phantom Ranch', i % 3 === 2 ? now - 24 * hour : now + hour)
 }
 const coordinator = await signIn(accounts.coordinator)
-const pending = check(await coordinator.functions.invoke('potential-incident', { body: { action: 'ingest', readings: floodReadings() } }))
+// The first gauge trip is dismissed; the gauge then trips again alongside the weather warning, left for the Coordinator to verify.
+const readings = floodReadings()
+const ingest = async (packet: unknown[]) => check(await coordinator.functions.invoke('potential-incident', { body: { action: 'ingest', readings: packet } }))
+const first = await ingest([readings.firstGauge])
+check(await coordinator.rpc('dismiss_potential_incident', { p_id: first.id, p_reason: 'gauge sensor fault' }))
+const pending = await ingest([readings.gauge, readings.warning, readings.news])
 console.log(`Reset 21 traveler Itineraries. Potential incident ${pending.id} awaits verification.`)
