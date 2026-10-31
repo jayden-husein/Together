@@ -1,16 +1,17 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { SignedIn } from './SignIn'
 import { SimulationLabel } from './ui'
 import Coordinator from './views/Coordinator'
 import EmergencyContact from './views/EmergencyContact'
 import PublicIncident from './views/PublicIncident'
 import Traveler from './views/Traveler'
 
-// Hash routing: no server rewrites needed on Vercel. The first route is the fallback.
+// Hash routing: no server rewrites needed on Vercel. The first route is the fallback; only it needs no sign-in.
 const ROUTES = [
-  { hash: '#/', label: 'Incident', View: PublicIncident },
-  { hash: '#/traveler', label: 'Traveler', View: Traveler },
-  { hash: '#/contact', label: 'Emergency Contact', View: EmergencyContact },
-  { hash: '#/coordinator', label: 'Coordinator', View: Coordinator },
+  { hash: '#/', label: 'Incident', View: PublicIncident, signIn: false },
+  { hash: '#/traveler', label: 'Traveler', View: Traveler, signIn: true },
+  { hash: '#/contact', label: 'Emergency Contact', View: EmergencyContact, signIn: true },
+  { hash: '#/coordinator', label: 'Coordinator', View: Coordinator, signIn: true },
 ]
 
 const subscribe = (onChange: () => void) => {
@@ -53,7 +54,7 @@ export default function App() {
         </nav>
       </header>
       <main ref={main} tabIndex={-1}>
-        <route.View />
+        {route.signIn ? <SignedIn><route.View /></SignedIn> : <route.View />}
       </main>
     </div>
   )
