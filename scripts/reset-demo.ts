@@ -1,5 +1,6 @@
 // Deletes and reloads only the demo data: the rows flagged `demo` and the demo Accounts.
 // Usage: npm run reset-demo -- staging|production
+import { confirmedStops } from '../supabase/functions/_shared/itinerary.ts'
 import { accounts, serverClient, password, signIn, url, publishableKey } from './demo.ts'
 
 const db = serverClient()
@@ -55,15 +56,24 @@ const [incident] = check(
 const hour = 60 * 60_000
 const now = Date.now()
 async function confirm(email: string, place: string, start: number) {
-  const client = await signIn(email)
   const stops = [{ place, start: new Date(start).toISOString(), end: new Date(start + hour).toISOString() }]
+  if (start < Date.now()) {
+    // Historical fixtures exercise non-overlap without allowing travelers to backdate plans.
+    const client = await signIn(email)
+    const { data: { user } } = await client.auth.getUser()
+    const { data: person } = await db.from('persons').select('id').eq('account_id', user!.id).single().throwOnError()
+    check(await db.rpc('confirm_itinerary', { p_report: crypto.randomUUID(), p_account: user!.id,
+      p_person: person.id, p_stops: confirmedStops(stops, start), p_matches: [] }))
+    return
+  }
+  const client = await signIn(email)
   check(await client.functions.invoke('confirm-itinerary', { body: { id: crypto.randomUUID(), stops } }))
 }
-await confirm(accounts.maya, 'Phantom Ranch', now)
+await confirm(accounts.maya, 'Phantom Ranch', now + hour)
 for (const [i, { name, email }] of travelers.entries()) {
   const accountId = await createAccount(email)
   check(await db.from('persons').insert({ account_id: accountId, name, demo }))
   // One group overlaps, one stays on the rim, one visited before the flood.
-  await confirm(email, i % 3 === 1 ? 'Mather Point' : 'Phantom Ranch', i % 3 === 2 ? now - 24 * hour : now)
+  await confirm(email, i % 3 === 1 ? 'Mather Point' : 'Phantom Ranch', i % 3 === 2 ? now - 24 * hour : now + hour)
 }
 console.log(`Reset 21 traveler Itineraries for Incident ${incident.id}.`)

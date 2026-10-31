@@ -28,6 +28,14 @@ it('rejects impossible calendar dates before Match', () => {
   expect(() => confirmedStops([{ ...stop, start: '2026-02-30T10:00:00Z', end: '2026-02-30T11:00:00Z' }])).toThrow()
 })
 it('accepts leap days and preserves timestamp precision', () => {
-  expect(confirmedStops([{ ...stop, start: '2028-02-29T10:00:10.123-07:00', end: '2028-02-29T10:00:50.456-07:00' }])[0])
+  expect(confirmedStops([{ ...stop, start: '2028-02-29T10:00:10.123-07:00', end: '2028-02-29T10:00:50.456-07:00' }], Date.parse('2028-02-28T00:00:00Z'))[0])
     .toEqual({ ...stop, start: '2028-02-29T17:00:10.123Z', end: '2028-02-29T17:00:50.456Z' })
+})
+it('rejects past starts and accepts the current instant at the earliest', () => {
+  const now = Date.parse('2028-02-29T17:00:10Z')
+  expect(() => confirmedStops([{ ...stop, start: '2028-02-29T17:00:09Z', end: '2028-02-29T18:00:00Z' }], now)).toThrow()
+  expect(confirmedStops([{ ...stop, start: '2028-02-29T17:00:10Z', end: '2028-02-29T18:00:00Z' }], now)).toHaveLength(1)
+})
+it('requires exactly four digits in both years', () => {
+  expect(() => confirmedStops([{ ...stop, start: '111111-01-01T10:00:00Z', end: '111111-01-01T11:00:00Z' }])).toThrow()
 })

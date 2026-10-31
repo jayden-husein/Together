@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CircleMarker, MapContainer, Tooltip } from 'react-leaflet'
 import { confirmedStops, maxStops, places, type Stop } from '../../supabase/functions/_shared/itinerary'
 import MapTiles from '../MapTiles'
@@ -8,6 +8,14 @@ type Draft = Omit<Stop, 'place'> & { place: string } & { key: string }
 const blank = (): Draft => ({ key: crypto.randomUUID(), place: '', start: '', end: '' })
 
 export default function Itinerary() {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+  // Inputs show Grand Canyon time. Round up to the next selectable minute.
+  const earliest = new Date(Math.ceil(now / 60_000) * 60_000 - 7 * 60 * 60_000).toISOString().slice(0, 16)
+  const latest = '9999-12-31T23:59'
   const [stops, setStops] = useState<Draft[]>([])
   const [id, setId] = useState(() => crypto.randomUUID())
   const [saving, setSaving] = useState(false)
@@ -36,15 +44,15 @@ export default function Itinerary() {
     <form className="itinerary" onSubmit={e => { e.preventDefault(); void confirm() }}>
       {stops.length > 0 && <p>Enter arrival and departure in Grand Canyon local time (MST).</p>}
       {stops.map((stop, i) => {
-        const change = (field: keyof Stop, value: string) => edit(stops.map(s => s.key === stop.key ? { ...s, [field]: value } : s))
+        const change = (field: keyof Stop, value: string) => edit(stops.map(s => s.key === stop.key ? { ...s, [field]: field === 'place' ? value : value.replace(/^(\d{4})\d+(?=-)/, '$1') } : s))
         return <fieldset key={stop.key} disabled={saving}>
           <legend>Stop {i + 1}</legend>
           <label>Place<select required value={stop.place} onChange={e => change('place', e.target.value)}>
             <option value="">Choose a place</option>
             {Object.keys(places).map(p => <option key={p}>{p}</option>)}
           </select></label>
-          <label>Arrival<input type="datetime-local" required value={stop.start} onChange={e => change('start', e.target.value)} /></label>
-          <label>Departure<input type="datetime-local" required min={stop.start} value={stop.end} onChange={e => change('end', e.target.value)} /></label>
+          <label>Arrival<input type="datetime-local" required min={earliest} max={latest} value={stop.start} onChange={e => change('start', e.target.value)} /></label>
+          <label>Departure<input type="datetime-local" required min={stop.start > earliest ? stop.start : earliest} max={latest} value={stop.end} onChange={e => change('end', e.target.value)} /></label>
           <button className="button" type="button" onClick={() => edit(stops.filter(s => s.key !== stop.key))}>Remove stop</button>
         </fieldset>
       })}
