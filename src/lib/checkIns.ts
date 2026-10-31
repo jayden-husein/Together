@@ -1,13 +1,16 @@
-// Public contract for the three signed-in screens in #7.
-import { useEffect, useState } from 'react'
-import { caseStatus, individualUpdateView, orderQueue, type CaseHistoryEntry, type CaseStatus } from './caseRules'
+// Public contract for the three signed-in screens: the Check-in loop (#7) and the Coordinator Case workflow (#8).
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { caseStatus, compareTimes, individualUpdateView, orderQueue, type CaseHistoryEntry, type CaseStatus, type Outcome } from './caseRules'
 import { supabase } from './supabase'
 
 export type CheckInStatus = 'safe' | 'needs_assistance'
 export type CheckInReport = { id: string; status: CheckInStatus; description: string | null; at: string }
 export type CheckInRequest = { caseId: string; incident: string; reports: CheckInReport[] }
 // `at`: when the status was set (the latest Report or resolution), else when the Case opened.
-export type QueueCase = { caseId: string; traveler: string; incident: string; explanation?: string; at: string } & CaseStatus
+// `owner`: the Coordinator with the latest claim, if any; `ownedByMe`: that claim is the signed-in Account's.
+export type QueueCase = {
+  caseId: string; traveler: string; incident: string; explanation?: string; at: string; owner: string | null; ownedByMe: boolean
+} & CaseStatus
 export type IndividualUpdate = {
   caseId: string
   traveler: string
@@ -19,6 +22,8 @@ export type IndividualUpdate = {
 export type ContactUpdate = IndividualUpdate
 
 type PollResult<T> = { data: T[] | undefined; error: string | null }
+// `reload`: read again now, e.g. right after the Account's own change, instead of on the next poll.
+type Poll<T> = PollResult<T> & { reload: () => void }
 
 type ReportRow = { case_id: string; id: string; created_at: string; original_text: string | null; body: { status: CheckInStatus } }
 
@@ -55,15 +60,20 @@ async function myCheckIns(): Promise<CheckInRequest[]> {
   return ids.flatMap(id => cases.get(id) ?? [])
 }
 
-function usePoll<T>(load: () => Promise<T[]>): PollResult<T> {
+function usePoll<T>(load: () => Promise<T[]>): Poll<T> {
   const [result, setResult] = useState<PollResult<T>>({ data: undefined, error: null })
+  const reload = useRef(() => {})
   useEffect(() => {
     let generation = 0
     let pending = false
+    let again = false
     let account: string | null | undefined
     async function poll() {
-      if (pending || account === undefined) return
+      if (account === undefined) return
+      // A read already in flight may predate the change, so read once more after it.
+      if (pending) { again = true; return }
       pending = true
+      again = false
       const version = generation
       try {
         const data = await load()
@@ -71,9 +81,13 @@ function usePoll<T>(load: () => Promise<T[]>): PollResult<T> {
       } catch (error) {
         if (version === generation) setResult({ data: undefined, error: error instanceof Error ? error.message : 'Could not load updates.' })
       } finally {
-        if (version === generation) pending = false
+        if (version === generation) {
+          pending = false
+          if (again) poll()
+        }
       }
     }
+    reload.current = poll
     // Discard prior-account rows and in-flight reads whenever the signed-in account changes.
     const { data } = supabase.auth.onAuthStateChange((_, session) => {
       const next = session?.user.id ?? null
@@ -81,6 +95,7 @@ function usePoll<T>(load: () => Promise<T[]>): PollResult<T> {
       account = next
       generation++
       pending = false
+      again = false
       setResult({ data: undefined, error: null })
       queueMicrotask(poll)
     })
@@ -88,11 +103,12 @@ function usePoll<T>(load: () => Promise<T[]>): PollResult<T> {
     return () => {
       generation++
       account = undefined
+      reload.current = () => {}
       data.subscription.unsubscribe()
       window.clearInterval(timer)
     }
   }, [load])
-  return result
+  return { ...result, reload: useCallback(() => reload.current(), []) }
 }
 
 export function useMyCheckIns() { return usePoll(myCheckIns) }
@@ -109,33 +125,51 @@ type QueueRow = {
   incidents: { name: string }
   reports: { kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
   opening?: { note: string | null }[]
-  case_events: { created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
+  case_events: { action: 'claimed' | 'resolved'; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome'] }[]
+}
+
+// Looks up a Coordinator's name by Account id; one without a name, or no longer listed, is just "Coordinator".
+async function coordinatorNames() {
+  const { data } = await supabase.from('coordinators').select('account_id, name').throwOnError()
+  const names = new Map(data.map(c => [c.account_id as string, c.name as string | null]))
+  return (accountId: string | null) => (accountId && names.get(accountId)) || 'Coordinator'
 }
 
 async function queue(): Promise<QueueCase[]> {
   const { data: coordinator } = await supabase.rpc('is_coordinator').throwOnError()
   if (!coordinator) throw new Error('A Coordinator account is required.')
   const rows = await readPages((from, to) => supabase.from('cases').select(
-    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(created_at, outcome), opening:case_events(note)',
-  ).in('reports.kind', ['check_in', 'cant_reach']).eq('case_events.action', 'resolved').eq('opening.action', 'opened')
+    'id, created_at, persons!inner(name), incidents!inner(name), reports(kind, body, created_at), case_events(action, actor, created_at, outcome), opening:case_events(note)',
+  ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'resolved']).eq('opening.action', 'opened')
     .order('created_at', { referencedTable: 'reports', ascending: false }).limit(1, { referencedTable: 'reports' })
+    .order('created_at', { referencedTable: 'case_events', ascending: false })
     .order('created_at').order('id').range(from, to).returns<QueueRow[]>().throwOnError())
+  const names = await coordinatorNames()
+  const { data: { session } } = await supabase.auth.getSession()
   return orderQueue(rows.map(row => {
     const history: CaseHistoryEntry[] = row.reports.map(report => ({
       at: report.created_at, outcome: null,
       status: report.kind === 'cant_reach' ? 'cant_reach' : report.body.status ?? null,
     }))
-    for (const event of row.case_events) history.push({ at: event.created_at, outcome: event.outcome, status: 'resolved' })
+    const resolutions = row.case_events.filter(e => e.action === 'resolved')
+    for (const event of resolutions) history.push({ at: event.created_at, outcome: event.outcome, status: 'resolved' })
     const status = caseStatus(history)
-    const at = status.status === 'resolved' ? row.case_events.find(e => e.outcome)?.created_at : row.reports[0]?.created_at
-    return { caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined, at: at ?? row.created_at, ...status }
+    // Case events come newest first, so the first one found is the latest.
+    const at = status.status === 'resolved' ? resolutions[0]?.created_at : row.reports[0]?.created_at
+    const claim = row.case_events.find(e => e.action === 'claimed')
+    const owner = claim ? names(claim.actor) : null
+    const ownedByMe = !!claim?.actor && claim.actor === session?.user.id
+    return {
+      caseId: row.id, traveler: row.persons.name, incident: row.incidents.name, explanation: row.opening?.[0]?.note ?? undefined,
+      at: at ?? row.created_at, owner, ownedByMe, ...status,
+    }
   }))
 }
 
 async function individualUpdates(): Promise<IndividualUpdate[]> {
   const data = await readPages(async (from, to) => {
     const { data } = await supabase.rpc('contact_case_updates')
-      .select('case_id, person_name, status, at')
+      .select('case_id, person_name, status, outcome, at')
       .in('entry_kind', ['check_in', 'cant_reach', 'resolved']).not('status', 'is', null)
       .order('at').order('case_id').order('status').range(from, to).throwOnError()
     if (!Array.isArray(data)) throw new Error('Expected a list of Individual Updates.')
@@ -156,4 +190,72 @@ export async function markIndividualUpdatesRead(notificationIds: string[]) {
 }
 
 export function useQueue() { return usePoll(queue) }
+
+type Urgency = 'immediate' | 'urgent' | 'can_wait'
+type CaseAction = 'opened' | 'check_in_request_sent' | 'urgency_proposed' | 'urgency_changed' | 'claimed' | 'contact_attempt' | 'note' | 'resolved'
+
+// One entry of a Case's history for a Coordinator. `text`: the traveler's own words or the Coordinator's note.
+// `fromReport`: the id of the Report the entry came from.
+export type CaseHistoryItem = {
+  id: string
+  at: string
+  entry: 'check_in' | 'cant_reach' | CaseAction
+  by: string
+  status: CheckInStatus | null
+  reached: boolean | null
+  outcome: Outcome | null
+  urgency: Urgency | null
+  text: string | null
+  fromReport: string | null
+}
+
+const reportSource: Record<string, string> = { emergency_contact: 'Emergency Contact', venue: 'Venue', device: 'Device' }
+
+async function caseHistory(caseId: string): Promise<CaseHistoryItem[]> {
+  type HistoryReport = { id: string; kind: 'check_in' | 'cant_reach'; source: string; created_at: string; original_text: string | null; body: { status?: CheckInStatus }; persons: { name: string } }
+  type HistoryEvent = { id: string; action: CaseAction; actor: string | null; created_at: string; note: string | null; reached: boolean | null; outcome: Outcome | null; urgency: Urgency | null; source_report_id: string | null }
+  const [reports, events, names] = await Promise.all([
+    readPages((from, to) => supabase.from('reports').select('id, kind, source, created_at, original_text, body, persons!inner(name)')
+      .eq('case_id', caseId).order('created_at').order('id').range(from, to).returns<HistoryReport[]>().throwOnError()),
+    readPages((from, to) => supabase.from('case_events').select('id, action, actor, created_at, note, reached, outcome, urgency, source_report_id')
+      .eq('case_id', caseId).order('created_at').order('id').range(from, to).returns<HistoryEvent[]>().throwOnError()),
+    coordinatorNames(),
+  ])
+  const none = { status: null, reached: null, outcome: null, urgency: null, fromReport: null }
+  const items: CaseHistoryItem[] = [
+    ...reports.map(r => ({
+      ...none, id: r.id, at: r.created_at, entry: r.kind, text: r.original_text, status: r.body.status ?? null,
+      by: r.source === 'traveler' ? r.persons.name : reportSource[r.source] ?? r.source,
+    })),
+    ...events.map(e => ({
+      id: e.id, at: e.created_at, entry: e.action, text: e.note, status: null,
+      reached: e.reached, outcome: e.outcome, urgency: e.urgency, fromReport: e.source_report_id,
+      // No actor: Together itself, or the AI for a proposed Urgency.
+      by: e.actor ? names(e.actor) : e.action === 'urgency_proposed' ? 'AI' : 'Together',
+    })),
+  ]
+  return items.sort((a, b) => compareTimes(b.at, a.at))
+}
+
+export function useCaseHistory(caseId: string) {
+  return usePoll(useCallback(() => caseHistory(caseId), [caseId]))
+}
+
+// What a Coordinator can add to a Case. Each is a new history entry; nothing earlier changes.
+// `fromReport`: the id of one of the Case's Reports that the entry follows up.
+export type CoordinatorAction =
+  | { action: 'claimed' }
+  | { action: 'contact_attempt'; reached: boolean; note: string; fromReport?: string }
+  | { action: 'note'; note: string; fromReport?: string }
+  | { action: 'resolved'; outcome: Outcome; note?: string; fromReport?: string }
+
+export async function recordCaseEvent(caseId: string, event: CoordinatorAction) {
+  await supabase.rpc('record_case_event', {
+    p_case_id: caseId, p_action: event.action,
+    p_note: 'note' in event ? event.note ?? null : null,
+    p_reached: 'reached' in event ? event.reached : null,
+    p_outcome: 'outcome' in event ? event.outcome : null,
+    p_source_report_id: 'fromReport' in event ? event.fromReport ?? null : null,
+  }).throwOnError()
+}
 export function useIndividualUpdates() { return usePoll(individualUpdates) }

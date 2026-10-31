@@ -15,6 +15,7 @@ What works in the final build. Only list a feature here once it works end to end
 
 - A deployed app skeleton: a Leaflet map of Grand Canyon on OpenStreetMap tiles, a simulation label, and a message if the map can't load.
 - The Check-in loop ([#7](https://github.com/jayden-husein/Together/issues/7)). Maya signs in and answers her Check-in Request: **Safe** in one tap, or **Needs assistance** with a description of what she needs and how urgent it is. She sees each Check-in she sent and when. Within about 3 seconds, the Coordinator's queue shows her Case's new status and when it was set, ordered Needs assistance, Can't reach, Unconfirmed, Safe, then Resolved. Her Emergency Contact gets an Individual Update with the status and time only, never her description, marked **New** until they've seen it.
+- The Coordinator Case workflow ([#8](https://github.com/jayden-husein/Together/issues/8)). In the queue, the Coordinator opens a Case and claims it, and the queue then shows them as its owner. They record Contact Attempts (Reached or Not reached, with a note) and notes relaying what Responders or law enforcement found, then resolve the Case as **Reached**, **Assistance provided** or **Not in area**. The Case's history lists every Report and action with who did it, when and which Report it came from. Nothing in it can be edited or deleted; a correction is a new entry. The Emergency Contact gets an Individual Update with the outcome, never the notes.
 
 ## Simulated
 
@@ -141,7 +142,7 @@ All demo accounts are synthetic, created by `npm run reset-demo`. They share one
 | --- | --- | --- | --- |
 | Maya | Traveler | `maya@demo.together.example.com` | Traveler |
 | Sam | Maya's Emergency Contact | `sam@demo.together.example.com` | Emergency Contact |
-| Coordinator | Coordinator | `coordinator@demo.together.example.com` | Coordinator |
+| Coordinator (Dana Ortiz) | Coordinator | `coordinator@demo.together.example.com` | Coordinator |
 | Unrelated | Signed-in Account with no link to Maya, used for the access check | `unrelated@demo.together.example.com` | any view; it sees nothing of Maya's |
 
 The public incident page needs no login. The Traveler, Emergency Contact and Coordinator views ask you to sign in, and one browser holds one sign-in at a time, so use a separate browser or private window for each Account.

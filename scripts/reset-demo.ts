@@ -35,7 +35,7 @@ for (const [role, email] of Object.entries(accounts) as [keyof typeof accounts, 
 const demo = true
 const [maya] = check(await db.from('persons').insert({ account_id: ids.maya, name: 'Maya', demo }).select())
 check(await db.from('emergency_contacts').insert({ person_id: maya.id, account_id: ids.emergencyContact, demo }))
-check(await db.from('coordinators').insert({ account_id: ids.coordinator, demo }))
+check(await db.from('coordinators').insert({ account_id: ids.coordinator, name: 'Dana Ortiz', demo }))
 
 // Hand-made flash flood along Bright Angel Creek at Phantom Ranch and the Black Bridge (GeoJSON is [lng, lat]).
 const [incident] = check(

@@ -1,3 +1,4 @@
+import type { Outcome } from './lib/caseRules'
 import './ui.css'
 
 // Shared UI. Every view uses these instead of its own badge, button or label; styles are in ui.css, values in tokens.css.
@@ -5,6 +6,7 @@ import './ui.css'
 export type CaseStatus = 'unconfirmed' | 'cant_reach' | 'needs_assistance' | 'safe' | 'resolved'
 export type Urgency = 'immediate' | 'urgent' | 'can_wait' | 'untriaged'
 export type CheckInStatus = Extract<CaseStatus, 'safe' | 'needs_assistance'>
+export type { Outcome }
 
 const STATUS_LABEL: Record<CaseStatus, string> = {
   unconfirmed: 'Unconfirmed',
@@ -12,6 +14,12 @@ const STATUS_LABEL: Record<CaseStatus, string> = {
   needs_assistance: 'Needs assistance',
   safe: 'Safe',
   resolved: 'Resolved',
+}
+
+export const OUTCOME_LABEL: Record<Outcome, string> = {
+  reached: 'Reached',
+  assistance_provided: 'Assistance provided',
+  not_in_area: 'Not in area',
 }
 
 const URGENCY_LABEL: Record<Urgency, string> = {
@@ -33,8 +41,10 @@ export function SimulationLabel() {
 /** `status-<status>` sets that status's colors (ui.css). Put it on anything tinted by a status, such as a Case row. */
 export const statusClass = (status: CaseStatus) => `status-${status}`
 
-export function StatusBadge({ status }: { status: CaseStatus }) {
-  return <span className={`badge ${statusClass(status)}`}>{STATUS_LABEL[status]}</span>
+/** A resolved Case's badge names its outcome when given one. */
+export function StatusBadge({ status, outcome }: { status: CaseStatus; outcome?: Outcome }) {
+  const label = STATUS_LABEL[status]
+  return <span className={`badge ${statusClass(status)}`}>{outcome ? `${label}: ${OUTCOME_LABEL[outcome]}` : label}</span>
 }
 
 export function UrgencyTag({ urgency }: { urgency: Urgency }) {
@@ -70,12 +80,17 @@ const timeFormat = new Intl.DateTimeFormat(undefined, {
   timeZoneName: 'short',
 })
 
+/** `at` (ISO 8601) as SourceLine shows it; unparseable input comes back as is. */
+export function formatTime(at: string) {
+  const date = new Date(at)
+  return isNaN(date.getTime()) ? at : timeFormat.format(date)
+}
+
 /** Where a piece of information came from and when: for Resources, Reports and a Case's Reports. `at` is ISO 8601. */
 export function SourceLine({ source, at }: { source: string; at: string }) {
-  const date = new Date(at)
   return (
     <p className="source-line">
-      {source}, <time dateTime={at}>{isNaN(date.getTime()) ? at : timeFormat.format(date)}</time>
+      {source}, <time dateTime={at}>{formatTime(at)}</time>
     </p>
   )
 }

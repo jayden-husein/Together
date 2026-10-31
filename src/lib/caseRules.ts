@@ -15,17 +15,20 @@ export type CaseStatus =
   | { status: 'resolved'; outcome: Outcome }
 
 // Date.parse handles offsets but discards the final three digits of a Postgres timestamp.
-function compareTimes(a: string, b: string) {
+export function compareTimes(a: string, b: string) {
   const millis = Date.parse(a) - Date.parse(b)
   if (millis) return millis
   const fraction = (at: string) => (at.match(/\.(\d+)/)?.[1] ?? '').padEnd(6, '0')
   return fraction(a).localeCompare(fraction(b))
 }
 
-// Resolved wins; otherwise the latest Check-in or Can't-reach report; otherwise Unconfirmed,
-// so silence is never taken for Safe.
+// Resolved wins, and a later resolution corrects an earlier one; otherwise the latest Check-in
+// or Can't-reach report; otherwise Unconfirmed, so silence is never taken for Safe.
 export function caseStatus(history: CaseHistoryEntry[]): CaseStatus {
-  const resolved = history.find((e) => e.status === 'resolved' && e.outcome)
+  let resolved: CaseHistoryEntry | undefined
+  for (const e of history) {
+    if (e.status === 'resolved' && e.outcome && (!resolved || compareTimes(e.at, resolved.at) >= 0)) resolved = e
+  }
   if (resolved) return { status: 'resolved', outcome: resolved.outcome! }
   let latest: { at: string; status: 'safe' | 'needs_assistance' | 'cant_reach' } | undefined
   for (const { at, status } of history) {
@@ -42,6 +45,8 @@ export function orderQueue<T extends { status: CaseStatus['status'] }>(cases: T[
   return [...cases].sort((a, b) => queuePriority[a.status] - queuePriority[b.status])
 }
 
-export function individualUpdateView(entry: { status: NonNullable<CaseHistoryEntry['status']>; at: string }) {
-  return { status: entry.status, at: entry.at }
+// Status, time and a resolution's outcome. Never notes or the traveler's own words.
+export function individualUpdateView(entry: { status: NonNullable<CaseHistoryEntry['status']>; at: string; outcome?: Outcome | null }):
+  { status: NonNullable<CaseHistoryEntry['status']>; at: string; outcome?: Outcome } {
+  return entry.status === 'resolved' && entry.outcome ? { status: entry.status, at: entry.at, outcome: entry.outcome } : { status: entry.status, at: entry.at }
 }

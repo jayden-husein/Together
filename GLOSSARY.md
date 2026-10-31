@@ -82,6 +82,14 @@ _Avoid_: Log contact
 The outcome of a Contact Attempt that got through to the person.
 _Avoid_: Contact confirmed
 
+**Owner**:
+The Coordinator following up a Case: whoever claimed it last. Claiming again, by anyone, is a new entry that changes the Owner.
+_Avoid_: Assignee
+
+**Outcome**:
+How a Case was resolved: **Reached**, **Assistance provided** or **Not in area**. A Case is resolved with exactly one; a later resolution corrects an earlier one. Emergency Contacts see the Outcome, never Coordinator notes.
+_Avoid_: Disposition, result
+
 ## Communication
 
 **General Update**:

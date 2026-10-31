@@ -36,3 +36,15 @@ test('two Reports in the same millisecond retain database timestamp order', () =
   expect(caseStatus([later, earlier])).toEqual({ status: 'needs_assistance' })
   expect(caseStatus([earlier, later])).toEqual({ status: 'needs_assistance' })
 })
+
+test('a later resolution corrects an earlier one', () => {
+  const first = { at: '2026-11-01T14:00:00Z', status: 'resolved', outcome: 'not_in_area' } as const
+  const correction = { at: '2026-11-01T14:10:00Z', status: 'resolved', outcome: 'reached' } as const
+  expect(caseStatus([first, correction])).toEqual({ status: 'resolved', outcome: 'reached' })
+  expect(caseStatus([correction, first])).toEqual({ status: 'resolved', outcome: 'reached' })
+})
+
+test('a resolved Individual Update carries its outcome', () => {
+  expect(individualUpdateView({ status: 'resolved', at: '2026-11-01T14:00:00Z', outcome: 'assistance_provided' }))
+    .toEqual({ status: 'resolved', at: '2026-11-01T14:00:00Z', outcome: 'assistance_provided' })
+})
