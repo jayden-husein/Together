@@ -53,6 +53,13 @@ _Avoid_: Record, submission, evidence (as a noun for one item)
 A Report of planned stops, each with a place and time window, confirmed by the traveler. The traveler's **plans**, the free text they pasted for the AI to read, are kept as its original text.
 _Avoid_: Trip plan (in code), schedule
 
+**Correction**:
+A new Itinerary that **supersedes** an old one, carrying over unchanged the old stops that have started. The old Itinerary stays as history but no longer counts.
+_Avoid_: Edit, update (of an Itinerary)
+
+**In force**:
+Said of an Itinerary that no Correction supersedes. Only Itineraries in force are listed to the traveler and matched against Incidents.
+
 **Check-in**:
 A Report in which a traveler says they are either **Safe** or **Needs assistance**, with a description of what they need and how urgent it is.
 

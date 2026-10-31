@@ -117,25 +117,29 @@ function usePoll<T>(load: () => Promise<T[]>): Poll<T> {
 
 export function useMyCheckIns() { return usePoll(myCheckIns) }
 
-// A confirmed Itinerary of the signed-in traveler. `at`: when it was confirmed; `originalText`: the plans they pasted, if any.
-export type ConfirmedItinerary = { id: string; at: string; stops: Stop[]; originalText: string | null }
+// A confirmed Itinerary of the signed-in traveler. `at`: when it was confirmed; `originalText`: the plans they pasted, if any;
+// `supersedes`: the Itinerary this one corrects, if it is a Correction.
+export type ConfirmedItinerary = { id: string; at: string; stops: Stop[]; originalText: string | null; supersedes: string | null }
 
 async function myItineraries(): Promise<ConfirmedItinerary[]> {
   // Coordinators may read other travelers' Reports too, so keep only the signed-in Account's own Person.
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return []
   const rows = await readPages((from, to) => supabase.from('reports')
-    .select('id, created_at, original_text, body, persons!inner(account_id)').eq('kind', 'itinerary').eq('persons.account_id', session.user.id)
+    .select('id, created_at, original_text, body, supersedes, persons!inner(account_id)').eq('kind', 'itinerary').eq('persons.account_id', session.user.id)
     .order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to)
-    .returns<{ id: string; created_at: string; original_text: string | null; body: { stops: Stop[] } }[]>().throwOnError())
-  return rows.map(row => ({ id: row.id, at: row.created_at, stops: row.body.stops, originalText: row.original_text }))
+    .returns<{ id: string; created_at: string; original_text: string | null; body: { stops: Stop[] }; supersedes: string | null }[]>().throwOnError())
+  return rows.map(row => ({ id: row.id, at: row.created_at, stops: row.body.stops, originalText: row.original_text, supersedes: row.supersedes }))
 }
 
 export function useMyItineraries() { return usePoll(myItineraries) }
-// `id`: an idempotency key, so a retried confirm stores one Itinerary.
-export async function confirmItinerary(body: { id: string; stops: Stop[]; originalText: string | null }) {
+export class AlreadyCorrectedError extends Error {}
+// `id`: an idempotency key, so a retried confirm stores one Itinerary. `supersedes`: the Itinerary a Correction replaces.
+export async function confirmItinerary(body: { id: string; stops: Stop[]; originalText: string | null; supersedes?: string }) {
   const { error } = await supabase.functions.invoke('confirm-itinerary', { body })
-  if (error) throw error
+  if (!error) return
+  if (error.context instanceof Response && (await error.context.json().catch(() => null))?.code === 'already_corrected') throw new AlreadyCorrectedError()
+  throw error
 }
 export async function submitCheckIn(caseId: string, status: CheckInStatus, description?: string) {
   await supabase.rpc('submit_check_in', {

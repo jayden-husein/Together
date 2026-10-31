@@ -31,19 +31,19 @@ async function verify(db: SupabaseClient, account: string, id: string, start: st
   if (draft.incident_id) return reply(200, 'Incident already verified.')
   const incident = { id, area: draft.area, starts_at: start, ends_at: end }
   for (let attempt = 0; attempt < 3; attempt++) {
-    const matches = []
+    const reports = []
     let count = 0
     for (let offset = 0; ; offset += 100) {
-      const page = await db.from('reports').select('id,person_id,body', { count: offset === 0 ? 'exact' : undefined })
+      const page = await db.from('reports').select('id,person_id,body,supersedes', { count: offset === 0 ? 'exact' : undefined })
         .eq('kind', 'itinerary').order('id').range(offset, offset + 99).throwOnError()
       if (offset === 0) count = page.count!
-      for (const report of page.data) {
-        for (const decision of match(report.person_id, report.body.stops, [incident])) {
-          matches.push({ ...decision, reportId: report.id })
-        }
-      }
+      reports.push(...page.data)
       if (page.data.length < 100) break
     }
+    // Only Itineraries in force match: skip those a Correction supersedes.
+    const superseded = new Set(reports.map(report => report.supersedes))
+    const matches = reports.filter(report => !superseded.has(report.id)).flatMap(report =>
+      match(report.person_id, report.body.stops, [incident]).map(decision => ({ ...decision, reportId: report.id })))
     const { error } = await db.rpc('verify_potential_incident', { p_id: id, p_account: account,
       p_start: start, p_end: end, p_matches: matches, p_report_count: count })
     if (!error) return reply(200, 'Incident verified.')

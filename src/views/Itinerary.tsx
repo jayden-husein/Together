@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { ProposedStop } from '../../supabase/functions/_shared/aiOutputCheck'
-import { confirmedStops, localDateTime, maxStops, maxTextLength, mstOffset, places, type Stop } from '../../supabase/functions/_shared/itinerary'
-import { confirmItinerary } from '../lib/checkIns'
+import { confirmedStops, localDateTime, lockedStops, maxStops, maxTextLength, mstOffset, places, type Stop } from '../../supabase/functions/_shared/itinerary'
+import { AlreadyCorrectedError, confirmItinerary, type ConfirmedItinerary } from '../lib/checkIns'
 import { supabase } from '../lib/supabase'
+import { formatTime } from '../ui'
 import StopsMap from './StopsMap'
 
 // From AI extraction: `quote`, the words the stop was read from; `needs`, what to fill in;
 // `times`, the HH:MM window read from plans that didn't say which day.
-type Draft = Omit<Stop, 'place'> & { place: string } & { key: string; quote?: string; needs?: ProposedStop['needs']; times?: { start: string; end: string } }
+// `locked`: a started stop of the Itinerary being corrected, carried over unchanged.
+type Draft = Omit<Stop, 'place'> & { place: string } & { key: string; quote?: string; needs?: ProposedStop['needs']; times?: { start: string; end: string }; locked?: Stop }
 const blank = (): Draft => ({ key: crypto.randomUUID(), place: '', start: '', end: '' })
 const proposed = (p: ProposedStop): Draft => ({
   key: crypto.randomUUID(), quote: p.quote, needs: p.needs, place: p.place ?? '',
@@ -17,7 +19,10 @@ const proposed = (p: ProposedStop): Draft => ({
 })
 
 // `onConfirmed`: called once an Itinerary is stored, e.g. to show it in the list right away.
-export default function Itinerary({ onConfirmed }: { onConfirmed?: () => void }) {
+// `correcting`: the Itinerary a Correction will supersede, loaded into the form when it mounts.
+export default function Itinerary({ correcting, onCancel, onConfirmed, onAlreadyCorrected }: {
+  correcting?: ConfirmedItinerary | null; onCancel?: () => void; onConfirmed?: () => void; onAlreadyCorrected?: () => void
+}) {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
@@ -26,12 +31,16 @@ export default function Itinerary({ onConfirmed }: { onConfirmed?: () => void })
   // Inputs show Grand Canyon time. Round up to the next selectable minute.
   const earliest = localDateTime(Math.ceil(now / 60_000) * 60_000)
   const latest = '9999-12-31T23:59'
-  const [stops, setStops] = useState<Draft[]>([])
+  const [stops, setStops] = useState<Draft[]>(() => {
+    const locked = lockedStops(correcting?.stops ?? [])
+    return (correcting?.stops ?? []).map(s => ({ key: crypto.randomUUID(), place: s.place,
+      start: localDateTime(Date.parse(s.start)), end: localDateTime(Date.parse(s.end)), locked: locked.includes(s) ? s : undefined }))
+  })
   const [id, setId] = useState(() => crypto.randomUUID())
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   // The traveler's pasted plans, kept with the confirmed Itinerary whether or not the AI read them.
-  const [text, setText] = useState('')
+  const [text, setText] = useState(correcting?.originalText ?? '')
   const [reading, setReading] = useState(false)
   const [readFailed, setReadFailed] = useState(false)
   function edit(next: Draft[]) {
@@ -56,9 +65,13 @@ export default function Itinerary({ onConfirmed }: { onConfirmed?: () => void })
     setSaving(true)
     setMessage('')
     try {
-      const payload = confirmedStops(stops.map(s => ({ ...s, start: s.start + mstOffset, end: s.end + mstOffset })))
-      try { await confirmItinerary({ id, stops: payload, originalText: text.trim() || null }) }
-      catch { throw new Error('Could not confirm your Itinerary. Your stops are here to try again.') }
+      const payload = confirmedStops(stops.map(s => s.locked ?? { ...s, start: s.start + mstOffset, end: s.end + mstOffset }), Date.now(), correcting?.stops)
+      try { await confirmItinerary({ id, stops: payload, originalText: text.trim() || null, ...correcting && { supersedes: correcting.id } }) }
+      catch (e) {
+        if (!(e instanceof AlreadyCorrectedError)) throw new Error('Could not confirm your Itinerary. Your stops are here to try again.')
+        onAlreadyCorrected?.()
+        throw new Error('This Itinerary was already corrected.')
+      }
       edit([])
       setText('')
       setMessage('Itinerary confirmed.')
@@ -68,6 +81,7 @@ export default function Itinerary({ onConfirmed }: { onConfirmed?: () => void })
   }
   return <section className="panel">
     <h2>Your Itinerary</h2>
+    {correcting && <p role="status">Correcting your Itinerary from <time dateTime={correcting.at}>{formatTime(correcting.at)}</time>. <button className="button" type="button" onClick={onCancel}>Cancel</button></p>}
     <form className="itinerary" onSubmit={e => { e.preventDefault(); void extract() }}>
       <label>Paste your plans<textarea required maxLength={maxTextLength} rows={3} value={text} disabled={reading || saving}
         placeholder="November 1, 2026: visitor center 7 to 8, then Phantom Ranch 1 to 4" onChange={e => setText(e.target.value)} /></label>
@@ -78,8 +92,8 @@ export default function Itinerary({ onConfirmed }: { onConfirmed?: () => void })
       {stops.length > 0 && <p>Enter arrival and departure in Grand Canyon local time (MST).</p>}
       {stops.map((stop, i) => {
         const change = (field: keyof Stop, value: string) => edit(stops.map(s => s.key === stop.key ? { ...s, [field]: field === 'place' ? value : value.replace(/^(\d{4})\d+(?=-)/, '$1') } : s))
-        return <fieldset key={stop.key} disabled={saving}>
-          <legend>Stop {i + 1}</legend>
+        return <fieldset key={stop.key} disabled={saving || !!stop.locked}>
+          <legend>Stop {i + 1}{stop.locked && ', started, kept as it was'}</legend>
           {stop.quote && <p>From your plans: “{stop.quote}”</p>}
           {stop.needs?.includes('place') && !stop.place && <p role="status">Choose which place you meant.</p>}
           {stop.needs?.includes('date') && !stop.start && <p role="status">Your plans don't say which day. Add the date.</p>}
@@ -97,7 +111,7 @@ export default function Itinerary({ onConfirmed }: { onConfirmed?: () => void })
       })}
       <StopsMap stops={stops} />
       <div><button className="button" type="button" disabled={saving || stops.length >= maxStops} onClick={() => edit([...stops, blank()])}>Add stop</button>
-        {stops.length > 0 && <button className="button" disabled={saving} type="submit">Confirm Itinerary</button>}</div>
+        {(stops.length > 0 || correcting) && <button className="button" disabled={saving} type="submit">Confirm Itinerary</button>}</div>
     </form>
     {message && <p role="status">{message}</p>}
   </section>

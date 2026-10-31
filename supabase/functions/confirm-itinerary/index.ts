@@ -3,6 +3,8 @@ import { headers, reply, signedInUser } from '../_shared/http.ts'
 import { confirmedStops, maxTextLength } from '../_shared/itinerary.ts'
 import { match } from '../_shared/match.ts'
 
+const uuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i
+
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response(null, { headers })
   if (request.method !== 'POST') return reply(405, { message: 'Use POST.' })
@@ -11,14 +13,24 @@ Deno.serve(async request => {
     const user = await signedInUser(db, request)
     if (!user) return reply(401, { message: 'Sign in to confirm.' })
     const body = await request.json().catch(() => null)
-    if (typeof body?.id !== 'string' || !/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(body.id)) return reply(400, { message: 'Invalid confirmation id.' })
+    if (typeof body?.id !== 'string' || !uuid.test(body.id)) return reply(400, { message: 'Invalid confirmation id.' })
     const originalText = body.originalText ?? null
     if (originalText !== null && (typeof originalText !== 'string' || originalText.length > maxTextLength)) return reply(400, { message: 'Invalid pasted text.' })
-    let stops
-    try { stops = confirmedStops(body.stops) }
-    catch (e) { return reply(400, { message: e instanceof Error ? e.message : 'Invalid stops.' }) }
+    const supersedes = body.supersedes ?? null
+    if (supersedes !== null && (typeof supersedes !== 'string' || !uuid.test(supersedes))) return reply(400, { message: 'Invalid Itinerary to correct.' })
     const { data: person } = await db.from('persons').select('id').eq('account_id', user.id).maybeSingle().throwOnError()
     if (!person) return reply(403, { message: 'A traveler account is required.' })
+    // A Correction must keep the started stops of the traveler's own Itinerary it supersedes.
+    let corrected
+    if (supersedes) {
+      const { data: old } = await db.from('reports').select('body').eq('id', supersedes).eq('person_id', person.id)
+        .eq('kind', 'itinerary').maybeSingle().throwOnError()
+      if (!old) return reply(400, { message: 'Invalid Itinerary to correct.' })
+      corrected = old.body.stops
+    }
+    let stops
+    try { stops = confirmedStops(body.stops, Date.now(), corrected) }
+    catch (e) { return reply(400, { message: e instanceof Error ? e.message : 'Invalid stops.' }) }
     const now = new Date().toISOString()
     for (let attempt = 0; attempt < 3; attempt++) {
       const { count } = await db.from('incidents').select('id', { head: true, count: 'exact' }).throwOnError()
@@ -33,8 +45,9 @@ Deno.serve(async request => {
         if (data.length < 100) break
       }
       const { error } = await db.rpc('confirm_matched_itinerary', { p_report: body.id, p_account: user.id,
-        p_person: person.id, p_stops: stops, p_matches: matches, p_incident_count: count, p_original_text: originalText })
+        p_person: person.id, p_stops: stops, p_matches: matches, p_incident_count: count, p_original_text: originalText, p_supersedes: supersedes })
       if (!error) return reply(200, { message: 'Itinerary confirmed.' })
+      if (error.code === 'TG409') return reply(409, { message: 'This Itinerary was already corrected.', code: 'already_corrected' })
       if (error.code !== '40001') throw error
     }
     return reply(409, { message: 'Incidents changed. Try confirming again.' })

@@ -1,12 +1,16 @@
 import Itineraries from './Itineraries'
 import Itinerary from './Itinerary'
 import { useState } from 'react'
-import { type CheckInRequest, type CheckInStatus, submitCheckIn, useMyCheckIns, useMyItineraries } from '../lib/checkIns'
+import { type CheckInRequest, type ConfirmedItinerary, type CheckInStatus, submitCheckIn, useMyCheckIns, useMyItineraries } from '../lib/checkIns'
 import { CheckInButtons, SourceLine, StatusBadge, statusClass } from '../ui'
 
 export default function Traveler() {
   const { data, error } = useMyCheckIns()
   const itineraries = useMyItineraries()
+  // The Itinerary being corrected; `form` changes to start the form afresh on Correct or Cancel.
+  const [correcting, setCorrecting] = useState<ConfirmedItinerary | null>(null)
+  const [form, setForm] = useState(0)
+  const restart = (itinerary: ConfirmedItinerary | null) => { setCorrecting(itinerary); setForm(f => f + 1) }
   return (
     <div className="column">
       <header className="view-header">
@@ -20,8 +24,9 @@ export default function Traveler() {
       ) : (
         data.map(request => <Request key={request.caseId} request={request} />)
       )}
-      <Itinerary onConfirmed={itineraries.reload} />
-      <Itineraries data={itineraries.data} error={itineraries.error} />
+      <Itinerary key={form} correcting={correcting} onCancel={() => restart(null)}
+        onConfirmed={() => { setCorrecting(null); itineraries.reload() }} onAlreadyCorrected={itineraries.reload} />
+      <Itineraries data={itineraries.data} error={itineraries.error} onCorrect={restart} />
     </div>
   )
 }

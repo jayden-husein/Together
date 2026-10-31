@@ -25,7 +25,9 @@ vi.mock('../lib/checkIns', () => ({
   fileCantReach,
   useMyItineraries: () => ({ data: data.itineraries, error: data.itinerariesError, reload: reloadItineraries }),
   confirmItinerary,
+  AlreadyCorrectedError,
 }))
+const AlreadyCorrectedError = vi.hoisted(() => class extends Error {})
 
 afterEach(() => {
   cleanup()
@@ -34,7 +36,7 @@ afterEach(() => {
   fileCantReach.mockClear()
   recordCaseEvent.mockClear()
   reloadItineraries.mockClear()
-  confirmItinerary.mockClear()
+  confirmItinerary.mockReset()
   data.itineraries = []
   data.itinerariesError = null
 })
@@ -77,7 +79,7 @@ test('the traveler sees what they sent and when, newest first', () => {
 })
 
 const itinerary = (fields: Partial<ConfirmedItinerary> & Pick<ConfirmedItinerary, 'id' | 'at'>): ConfirmedItinerary =>
-  ({ stops: [{ place: 'Phantom Ranch', start: '2099-11-01T14:00:00Z', end: '2099-11-01T18:00:00Z' }], originalText: null, ...fields })
+  ({ stops: [{ place: 'Phantom Ranch', start: '2099-11-01T14:00:00Z', end: '2099-11-01T18:00:00Z' }], originalText: null, supersedes: null, ...fields })
 
 test('the traveler sees their current Itineraries, newest first, each with its stops in Grand Canyon time', () => {
   data.itineraries = [
@@ -123,6 +125,60 @@ test('confirming an Itinerary refreshes the list', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
   await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
   expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ stops: [{ place: 'Phantom Ranch', start: '2099-11-01T14:00:00.000Z', end: '2099-11-01T18:00:00.000Z' }] }))
+})
+
+// Underway: Mather Point has started, Phantom Ranch is still to come.
+const underway = () => itinerary({ id: 'trip', at: '2026-10-31T09:00:00Z', originalText: 'Mather Point, then Phantom Ranch', stops: [
+  { place: 'Mather Point', start: '2026-01-01T14:00:00.000Z', end: '2099-01-01T15:00:00.000Z' },
+  { place: 'Phantom Ranch', start: '2099-11-01T14:00:00.000Z', end: '2099-11-01T18:00:00.000Z' },
+] })
+const startCorrecting = () => {
+  data.itineraries = [underway()]
+  render(<Traveler />)
+  fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
+}
+
+test('Correct loads the Itinerary into the form with started stops locked, and Cancel records nothing', () => {
+  startCorrecting()
+  expect(screen.getByText(/Correcting your Itinerary from/)).toBeTruthy()
+  expect((screen.getByLabelText('Paste your plans') as HTMLTextAreaElement).value).toBe('Mather Point, then Phantom Ranch')
+  const [started, toCome] = screen.getAllByRole('group', { name: /^Stop/ })
+  expect((started as HTMLFieldSetElement).disabled).toBe(true)
+  expect((within(started).getByLabelText('Place') as HTMLSelectElement).value).toBe('Mather Point')
+  expect((toCome as HTMLFieldSetElement).disabled).toBe(false)
+  expect((within(toCome).getByLabelText('Arrival') as HTMLInputElement).value).toBe('2099-11-01T07:00')
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  expect(screen.queryByText(/Correcting your Itinerary/)).toBeNull()
+  expect(screen.queryAllByRole('group', { name: /^Stop/ })).toHaveLength(0)
+  expect(confirmItinerary).not.toHaveBeenCalled()
+})
+
+test('confirming a Correction supersedes the old Itinerary and carries its started stops over', async () => {
+  startCorrecting()
+  const toCome = screen.getAllByRole('group', { name: /^Stop/ })[1]
+  fireEvent.change(within(toCome).getByLabelText('Place'), { target: { value: 'Yavapai Point' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
+  expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ supersedes: 'trip', stops: [
+    underway().stops[0], { ...underway().stops[1], place: 'Yavapai Point' },
+  ] }))
+  expect(screen.queryByText(/Correcting your Itinerary/)).toBeNull()
+})
+
+test('a superseded Itinerary leaves the list and its Correction shows', () => {
+  data.itineraries = [underway(), itinerary({ id: 'fix', at: '2026-10-31T10:00:00Z', supersedes: 'trip' })]
+  render(<Traveler />)
+  const entries = within(screen.getByRole('list', { name: 'Your confirmed Itineraries' })).getAllByRole('listitem', { name: /Itinerary confirmed/ })
+  expect(entries.map(e => e.getAttribute('aria-label'))).toEqual(['Itinerary confirmed 2026-10-31T10:00:00Z'])
+})
+
+test('a second Correction of the same Itinerary is refused, keeping the draft and showing the current Itinerary', async () => {
+  confirmItinerary.mockRejectedValueOnce(new AlreadyCorrectedError())
+  startCorrecting()
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  expect(await screen.findByText('This Itinerary was already corrected.')).toBeTruthy()
+  expect(reloadItineraries).toHaveBeenCalled()
+  expect(screen.getAllByRole('group', { name: /^Stop/ })).toHaveLength(2)
 })
 
 test('the queue lists Cases with status badges in the order Case rules return', () => {
