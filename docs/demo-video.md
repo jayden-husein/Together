@@ -37,9 +37,9 @@ Lines in quotes are the voice-over. Two people read it: **Speaker A** voices the
 
 ### 3. The flood (0:40–1:10)
 
-**Show:** the Coordinator view. Pause on the **Dismissed Potential incidents** row (gauge sensor fault), then the pending panel: **Corroborated**, the note about the earlier dismissal, and the source quotes. Click **Verify Incident**.
+**Show:** the Coordinator view. Pause on the **Dismissed Potential incidents** row (gauge sensor fault), then the pending panel: **Corroborated**, the note about the earlier dismissal, and the source quotes. Scroll to **Verify this Incident** and set the **Start** time of the Incident time window so it covers Maya's Phantom Ranch stop (leave **End** empty, since the flood is ongoing). Then click **Verify Incident**.
 
-> **Speaker B:** "A stream gauge, a weather warning and a news report come in. The AI summarizes them into a Potential incident, quoting each source, and the area comes from the sources themselves. Earlier, the gauge tripped alone and the Coordinator dismissed it as a sensor fault, and Together shows that. Now two sources agree. A person, not the AI, verifies it."
+> **Speaker B:** "A stream gauge, a weather warning and a news report come in. The AI summarizes them into a Potential incident, quoting each source, and the area comes from the sources themselves. Earlier, the gauge tripped alone and the Coordinator dismissed it as a sensor fault, and Together shows that. Now two sources agree. A person, not the AI, sets when it started and verifies it."
 
 ### 4. Who might be there (1:10–1:20)
 
