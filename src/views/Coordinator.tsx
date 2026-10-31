@@ -112,7 +112,8 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
       <EventForm legend="Resolve" submitLabel="Resolve" note="optional" reports={reports} choices={OUTCOMES}
         onSubmit={(outcome, extra) => record({ action: 'resolved', outcome: outcome as Outcome, ...extra })} />
       </details>
-      <h3>History</h3>
+      <details className="case-tools">
+        <summary>History</summary>
       {error && <p role="alert">{error}</p>}
       {!data ? (
         !error && <p className="empty">Loading…</p>
@@ -122,6 +123,7 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
           {data.map(item => <HistoryEntry key={item.id} item={item} from={data.find(r => r.id === item.fromReport)} />)}
         </ul>
       )}
+      </details>
     </section>
   )
 }

@@ -202,7 +202,9 @@ test('the Case history says who did what, when and from which Report, with no wa
     item({ id: 'u1', entry: 'urgency_proposed', by: 'AI', at: '2026-10-31T14:12:01Z', urgency: 'urgent', fromReport: 'r1' }),
     item({ id: 'r1', entry: 'check_in', by: 'Maya Chen', at: '2026-10-31T14:12:00Z', status: 'needs_assistance', text: 'Water rising' }),
   ]
-  const history = within(openMayaCase().getByRole('list', { name: 'Case history' }))
+  const detail = openMayaCase()
+  fireEvent.click(detail.getByText('History'))
+  const history = within(detail.getByRole('list', { name: 'Case history' }))
   const entries = history.getAllByRole('listitem')
   expect(entries.map(e => e.textContent)).toEqual([
     expect.stringMatching(/Resolved: Reached.*Dana Ortiz/),
