@@ -1,3 +1,5 @@
+import { useAccount } from '../SignIn'
+import { toast } from '../components'
 import GeneralUpdateNotices from './GeneralUpdateNotices'
 import Itineraries from './Itineraries'
 import Itinerary from './Itinerary'
@@ -7,6 +9,7 @@ import { RESOURCE_KIND_LABEL } from '../../supabase/functions/_shared/resources'
 import { CheckInButtons, ResourceSource, SimulationLabel, SourceLine, StatusBadge, statusClass } from '../ui'
 
 export default function Traveler() {
+  const account = useAccount()
   const { data, error } = useMyCheckIns()
   const itineraries = useMyItineraries()
   // The Itinerary being corrected; `form` changes to start the form afresh on Correct or Cancel.
@@ -16,7 +19,7 @@ export default function Traveler() {
   return (
     <div className="column">
       <header className="view-header">
-        <h1>Your Check-in</h1>
+        <h1>Hi {account.capabilities?.name.split(' ')[0] || 'there'}</h1><p className="lede">Your plans, your people, your peace of mind.</p><a href="#/contact">You also have an Emergency Contact page. Go to Emergency Contact</a>
       </header>
       <GeneralUpdateNotices />
       {error && <p role="alert">{error}</p>}
@@ -35,6 +38,10 @@ export default function Traveler() {
 }
 
 function Request({ request }: { request: CheckInRequest }) {
+  const [changing, setChanging] = useState(false)
+  const [answer, setAnswer] = useState<CheckInStatus | null>(null)
+  const latest = request.reports[0]
+  const answered = answer || latest && (!request.requestedAt || Date.parse(latest.at) >= Date.parse(request.requestedAt)) && latest.status
   const [asking, setAsking] = useState(false)
   const [description, setDescription] = useState('')
   const [sending, setSending] = useState(false)
@@ -51,10 +58,10 @@ function Request({ request }: { request: CheckInRequest }) {
         setAsking(false)
         setDescription('')
       }
-      setMessage({ text: 'Check-in sent.' })
+      setMessage({ text: 'Check-in sent.' }); setAnswer(status); setChanging(false); toast('Check-in sent')
     } catch (e) {
       // Keep the description so nothing they typed is lost; they can send again.
-      setMessage({ text: `Couldn't send your Check-in: ${e instanceof Error ? e.message : 'try again'}.`, failed: true })
+      setMessage({ text: 'Could not send your check-in. Retry when connected.', failed: true })
     } finally {
       setSending(false)
     }
@@ -63,11 +70,12 @@ function Request({ request }: { request: CheckInRequest }) {
   return (
     <>
       <section className="panel panel-request" aria-label="Check-in Request">
-        <h2>Check-in Request</h2>
+        <h2>{answered && !changing ? `You checked in ${answered === 'safe' ? 'Safe' : 'Needs assistance'}` : 'Check-in Request'}</h2>
+        {answered && !changing && <><SourceLine source="Checked in" at={latest?.at ?? new Date().toISOString()} />{answered === 'needs_assistance' && <p>Help has been requested; a coordinator will contact you</p>}<button type="button" className="link-button" onClick={() => setChanging(true)}>Change answer</button></>}
         <p>{request.incident}: Coordinators are asking whether you're safe. Choose one.</p>
-        <p>Nearest Resource: <strong>{request.nearestResource.name}</strong> ({RESOURCE_KIND_LABEL[request.nearestResource.kind]}) <SimulationLabel />. {request.nearestResource.availability}.</p>
-        <ResourceSource resource={request.nearestResource} />
-        <CheckInButtons onCheckIn={status => (status === 'safe' ? send('safe') : setAsking(true))} />
+        {answered !== 'safe' && <><p>Nearest Resource: <strong>{request.nearestResource.name}</strong> ({RESOURCE_KIND_LABEL[request.nearestResource.kind]}) <SimulationLabel />. {request.nearestResource.availability}.</p>
+        <ResourceSource resource={request.nearestResource} /></>}
+        {(!answered || changing) && <CheckInButtons disabled={sending} onCheckIn={status => (status === 'safe' ? send('safe') : setAsking(true))} />}
         {asking && (
           <form className="describe" onSubmit={e => { e.preventDefault(); send('needs_assistance') }}>
             <label htmlFor={`describe-${request.caseId}`}>What do you need, and how urgent is it?</label>

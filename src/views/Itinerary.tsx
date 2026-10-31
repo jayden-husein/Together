@@ -1,3 +1,5 @@
+import { toast } from '../components'
+import { useDraft } from '../lib/drafts'
 import { useEffect, useState } from 'react'
 import type { ProposedStop } from '../../supabase/functions/_shared/aiOutputCheck'
 import { confirmedStops, localDateTime, lockedStops, maxStops, maxTextLength, mstOffset, places, type Stop } from '../../supabase/functions/_shared/itinerary'
@@ -40,7 +42,7 @@ export default function Itinerary({ correcting, onCancel, onConfirmed, onAlready
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   // The traveler's pasted plans, kept with the confirmed Itinerary whether or not the AI read them.
-  const [text, setText] = useState(correcting?.originalText ?? '')
+  const [text, setText] = useDraft(`itinerary:${correcting?.id ?? 'new'}`, correcting?.originalText ?? '')
   const [reading, setReading] = useState(false)
   const [readFailed, setReadFailed] = useState(false)
   function edit(next: Draft[]) {
@@ -74,13 +76,13 @@ export default function Itinerary({ correcting, onCancel, onConfirmed, onAlready
       }
       edit([])
       setText('')
-      setMessage('Itinerary confirmed.')
+      setMessage('Itinerary confirmed.'); toast('Itinerary confirmed')
       onConfirmed?.()
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not confirm your Itinerary.') }
     finally { setSaving(false) }
   }
   return <section className="panel">
-    <h2>Your Itinerary</h2>
+    <h2>Your itinerary</h2><ol className="stepper" aria-label="Itinerary steps"><li>1 Paste plans</li><li>2 Review stops</li><li>3 Confirm</li></ol><p className="lede">Fill in stops, review places and times, then confirm your itinerary to share it with Coordinators.</p>
     {correcting && <p role="status">Correcting your Itinerary from <time dateTime={correcting.at}>{formatTime(correcting.at)}</time>. <button className="button" type="button" onClick={onCancel}>Discard correction</button></p>}
     <form className="itinerary" onSubmit={e => { e.preventDefault(); void extract() }}>
       <label>Paste your plans<textarea required maxLength={maxTextLength} rows={3} value={text} disabled={reading || saving}
@@ -104,14 +106,18 @@ export default function Itinerary({ correcting, onCancel, onConfirmed, onAlready
             <option value="">Choose a place</option>
             {Object.keys(places).map(p => <option key={p}>{p}</option>)}
           </select></label>
-          <label>Arrival<input type="datetime-local" required min={earliest} max={latest} value={stop.start} onChange={e => change('start', e.target.value)} /></label>
-          <label>Departure<input type="datetime-local" required min={stop.start > earliest ? stop.start : earliest} max={latest} value={stop.end} onChange={e => change('end', e.target.value)} /></label>
+          <label>Arrival · MST, Grand Canyon local<input type="datetime-local" required min={earliest} max={latest} value={stop.start} onChange={e => change('start', e.target.value)} /></label>
+          <label>Departure · MST, Grand Canyon local<input type="datetime-local" required min={stop.start > earliest ? stop.start : earliest} max={latest} value={stop.end} onChange={e => change('end', e.target.value)} /></label>
+          {!stop.place && <p className="field-error">Choose a place for this stop.</p>}
+          {stop.start && stop.end && stop.end <= stop.start && <p className="field-error" role="alert">Departure must be after arrival.</p>}
+          {stop.start && stop.end && stops.some((other,j) => j !== i && other.start < stop.end && other.end > stop.start) && <p className="field-error" role="alert">This stop overlaps another stop. Adjust its times.</p>}
+          {stop.start && stop.end > stop.start && <span className="tag">{Math.round((Date.parse(stop.end)-Date.parse(stop.start))/60000)} min</span>}
           <button className="button" type="button" onClick={() => edit(stops.filter(s => s.key !== stop.key))}>Remove stop</button>
         </fieldset>
       })}
       <StopsMap stops={stops} />
       <div><button className="button" type="button" disabled={saving || stops.length >= maxStops} onClick={() => edit([...stops, blank()])}>Add stop</button>
-        {(stops.length > 0 || correcting) && <button className="button" disabled={saving} type="submit">Confirm Itinerary</button>}</div>
+        {(stops.length > 0 || correcting) && <button className="button" disabled={saving} type="submit">Confirm itinerary</button>}</div>
     </form>
     {message && <p role="status">{message}</p>}
   </section>

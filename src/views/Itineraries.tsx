@@ -1,3 +1,4 @@
+import { toast } from '../components'
 import { useState } from 'react'
 import { inForce, isCurrent, lockedStops, withdraws } from '../../supabase/functions/_shared/itinerary'
 import { compareTimes } from '../lib/caseRules'
@@ -16,7 +17,7 @@ export default function Itineraries({ data, error, onCorrect, onChange }: {
   return <section className="panel">
     <h2>Your confirmed Itineraries</h2>
     {message && <p role="status">{message}</p>}
-    {error && <p role="alert">Could not load your Itineraries: {error}</p>}
+    {error && <p role="alert">Could not load your itineraries. Try again.</p>}
     {!current ? (
       !error && <p className="empty">Loading…</p>
     ) : current.length === 0 ? (
@@ -40,7 +41,7 @@ function Entry({ itinerary, onCorrect, onChange, onMessage: setMessage }: {
     try {
       // Started stops carry over; nothing else does.
       await confirmItinerary({ id: crypto.randomUUID(), stops: lockedStops(itinerary.stops), originalText: itinerary.originalText, supersedes: itinerary.id })
-      onChange()
+      toast('Itinerary withdrawn'); onChange()
     } catch (e) {
       if (e instanceof AlreadyCorrectedError) onChange()
       setMessage(e instanceof AlreadyCorrectedError ? 'This Itinerary was already corrected.' : 'Could not withdraw your Itinerary. Try again.')

@@ -1,3 +1,5 @@
+import { sendCheckInRequest, restorePotentialIncident } from '../lib/checkIns'
+import { Button, Callout, toast } from '../components'
 import PostGeneralUpdate from './PostGeneralUpdate'
 import PotentialIncidentReview, { DismissalLine } from './PotentialIncidentReview'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
@@ -40,7 +42,7 @@ export default function Coordinator() {
       {dismissed.data?.length ? <section className="panel potential-review">
         <h2>Dismissed Potential incidents</h2>
         <ul className="rows" aria-label="Dismissed Potential incidents">
-          {dismissed.data.map(d => <li className="row" key={d.id}><span className="row-name">{d.name}</span><DismissalLine dismissal={d} /></li>)}
+          {dismissed.data.map(d => <li className="row" key={d.id}><span className="row-name">{d.name}</span><DismissalLine dismissal={d} /><Button onClick={async () => { try { await restorePotentialIncident(d.id); dismissed.reload(); pending.reload(); toast('Potential incident restored') } catch { toast('Could not restore. Retry.') } }}>Restore</Button></li>)}
         </ul>
       </section> : null}
       <PostGeneralUpdate />
@@ -112,7 +114,10 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
   // Only Reports can be followed up, not other Case events.
   const reports = data?.filter(item => item.entry === 'check_in' || item.entry === 'cant_reach') ?? []
   async function record(event: CoordinatorAction) {
+    if (event.action === 'released' && !window.confirm('Unclaim this case?')) return
+    if (event.action === 'resolved' && !window.confirm('Resolve this case with the selected outcome?')) return
     await recordCaseEvent(c.caseId, event)
+    toast(event.action === 'contact_attempt' ? 'Contact attempt recorded' : event.action === 'note' ? 'Note added' : event.action === 'claimed' ? 'Case claimed' : event.action === 'released' ? 'Case unclaimed' : 'Case updated')
     reload()
     onChange()
   }
@@ -122,6 +127,8 @@ function CaseDetail({ c, onChange }: { c: QueueCase; onChange: () => void }) {
         <p>{c.incident}</p><div><StatusBadge status={c.status} outcome={c.status === 'resolved' ? c.outcome : undefined} /></div>
       </header>
       <p className="lede">Notes stay with Coordinators. Emergency Contacts see only the outcome.</p>
+      {c.conflict && <Callout tone="warn">{c.traveler} checked in Safe at {formatTime(c.conflict.safeAt)}; contact reported can't reach at {formatTime(c.conflict.reportAt)}.</Callout>}
+      {c.status === 'unconfirmed' && <Button onClick={async () => { try { await sendCheckInRequest(c.caseId); toast('Check-in request sent') } catch { toast('Could not send. Retry.') } }}>Send check-in request</Button>}
       <Triage c={c} />
       {c.explanation && <p>Matched stop: {c.explanation}</p>}
       {c.itineraryText && <blockquote aria-label="What the traveler pasted for their Itinerary">{c.itineraryText}</blockquote>}
@@ -220,7 +227,7 @@ function EventForm({ legend, submitLabel, choices = [], note, reports = [], disa
       setFromReport('')
     } catch (err) {
       // Keep what they entered so they can try again.
-      setFailure(`Couldn't save: ${err instanceof Error ? err.message : 'try again'}.`)
+      setFailure('Could not save. Your text is here. Retry when connected.')
     } finally {
       setSending(false)
     }

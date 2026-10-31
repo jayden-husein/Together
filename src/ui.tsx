@@ -53,16 +53,16 @@ export function UrgencyTag({ urgency }: { urgency: Urgency }) {
   return <span className={`tag tag-${urgency}`}>{URGENCY_LABEL[urgency]}</span>
 }
 
-export function CheckInButtons({ onCheckIn }: { onCheckIn: (status: CheckInStatus) => void }) {
+export function CheckInButtons({ onCheckIn, disabled = false }: { disabled?: boolean; onCheckIn: (status: CheckInStatus) => void }) {
   return (
     <div className="check-in" role="group" aria-label="Check in">
-      <button type="button" className="check-in-button check-in-safe" onClick={() => onCheckIn('safe')}>
+      <button type="button" disabled={disabled} className="check-in-button check-in-safe" onClick={() => onCheckIn('safe')}>
         <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 12.5l4.5 4.5L19 7.5" />
         </svg>
         Safe
       </button>
-      <button type="button" className="check-in-button check-in-needs-assistance" onClick={() => onCheckIn('needs_assistance')}>
+      <button type="button" disabled={disabled} className="check-in-button check-in-needs-assistance" onClick={() => onCheckIn('needs_assistance')}>
         <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7.5v5.5M12 16.5v.01" />
@@ -108,6 +108,6 @@ export const Local = ({ at }: { at: string }) => <time dateTime={at}>{localTime.
 export function Stops({ stops, label }: { stops: Stop[]; label?: string }) {
   if (!stops.length) return <p className="empty">No stops.</p>
   return <ol aria-label={label}>
-    {stops.map((stop, i) => <li key={i}><strong>{stop.place}</strong>: <Local at={stop.start} /> to <Local at={stop.end} /> (Grand Canyon time)</li>)}
+    {stops.map((stop, i) => <li key={i}><strong>{stop.place}</strong>: <Local at={stop.start} /> to <Local at={stop.end} /> (MST, Grand Canyon local)</li>)}
   </ol>
 }

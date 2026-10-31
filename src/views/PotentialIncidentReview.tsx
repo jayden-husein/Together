@@ -42,7 +42,7 @@ export default function PotentialIncidentReview({ draft, onDecided }: { draft: P
   }
   function dismiss(event: FormEvent) {
     event.preventDefault()
-    if (reason.trim()) decide(() => dismissPotentialIncident(draft.id, reason.trim()), 'Could not dismiss the Potential incident. Try again.')
+    if (reason.trim() && window.confirm('Dismiss this potential incident? You can restore it later.')) decide(() => dismissPotentialIncident(draft.id, reason.trim()), 'Could not dismiss the Potential incident. Try again.')
   }
   return <section className="panel potential-review" aria-label={draft.name}>
     <header className="review-heading">
