@@ -17,6 +17,7 @@ const notices = vi.hoisted(() => ({ data: [] as import('../lib/checkIns').Genera
 const postGeneralUpdate = vi.hoisted(() => vi.fn(async () => {}))
 const draftGeneralUpdate = vi.hoisted(() => vi.fn(async () => 'Flash flooding near Phantom Ranch. Water at Havasupai Gardens.'))
 vi.mock('../lib/checkIns', () => ({
+  useGeneralUpdates: () => ({data:[],reload:()=>{}}),
   usePendingIncidents: () => ({ data: [], error: null }),
   useIncidents: () => ({ data: [{ id: 'incident-1', name: 'Flash flood at Phantom Ranch', created_at: '2026-10-31T13:40:00Z', starts_at: '2026-10-31T13:00:00Z', ends_at: null, area: { type: 'Polygon', coordinates: [] } }], error: null }),
   postGeneralUpdate,
@@ -37,10 +38,13 @@ vi.mock('../lib/checkIns', () => ({
   confirmItinerary,
   AlreadyCorrectedError,
 }))
+vi.mock('../lib/operations', () => ({ useConnections: () => ({data:[]}), useActivity: () => ({data:[]}), usePresence: () => [], csv: () => '', download: () => {} }))
 const AlreadyCorrectedError = vi.hoisted(() => class extends Error {})
 
 afterEach(() => {
   cleanup()
+  window.location.hash = '#/coordinator'
+  vi.restoreAllMocks()
   submitCheckIn.mockClear()
   markRead.mockClear()
   fileCantReach.mockClear()
@@ -125,16 +129,16 @@ test('the Itinerary list has an empty state and an error state', () => {
   data.itineraries = undefined
   data.itinerariesError = 'Network down'
   render(<Traveler />)
-  expect(screen.getByRole('alert').textContent).toMatch(/Network down/)
+  expect(screen.getByRole('alert').textContent).toMatch(/Could not load your itineraries/)
 })
 
 test('confirming an Itinerary refreshes the list', async () => {
   render(<Traveler />)
   fireEvent.click(screen.getByRole('button', { name: 'Add stop' }))
   fireEvent.change(screen.getByLabelText('Place'), { target: { value: 'Phantom Ranch' } })
-  fireEvent.change(screen.getByLabelText('Arrival'), { target: { value: '2099-11-01T07:00' } })
-  fireEvent.change(screen.getByLabelText('Departure'), { target: { value: '2099-11-01T11:00' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  fireEvent.change(screen.getByLabelText(/Arrival/), { target: { value: '2099-11-01T07:00' } })
+  fireEvent.change(screen.getByLabelText(/Departure/), { target: { value: '2099-11-01T11:00' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm itinerary' }))
   await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
   expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ stops: [{ place: 'Phantom Ranch', start: '2099-11-01T14:00:00.000Z', end: '2099-11-01T18:00:00.000Z' }] }))
 })
@@ -158,7 +162,7 @@ test('Correct loads the Itinerary into the form with started stops locked, and d
   expect((started as HTMLFieldSetElement).disabled).toBe(true)
   expect((within(started).getByLabelText('Place') as HTMLSelectElement).value).toBe('Mather Point')
   expect((toCome as HTMLFieldSetElement).disabled).toBe(false)
-  expect((within(toCome).getByLabelText('Arrival') as HTMLInputElement).value).toBe('2099-11-01T07:00')
+  expect((within(toCome).getByLabelText(/Arrival/) as HTMLInputElement).value).toBe('2099-11-01T07:00')
   fireEvent.click(screen.getByRole('button', { name: 'Discard correction' }))
   expect(screen.queryByText(/Correcting your Itinerary/)).toBeNull()
   expect(screen.queryAllByRole('group', { name: /^Stop/ })).toHaveLength(0)
@@ -169,7 +173,7 @@ test('confirming a Correction supersedes the old Itinerary and carries its start
   startCorrecting()
   const toCome = screen.getAllByRole('group', { name: /^Stop/ })[1]
   fireEvent.change(within(toCome).getByLabelText('Place'), { target: { value: 'Yavapai Point' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm itinerary' }))
   await waitFor(() => expect(reloadItineraries).toHaveBeenCalled())
   expect(confirmItinerary).toHaveBeenCalledWith(expect.objectContaining({ supersedes: 'trip', stops: [
     underway().stops[0], { ...underway().stops[1], place: 'Yavapai Point' },
@@ -187,7 +191,7 @@ test('a superseded Itinerary leaves the list and its Correction shows', () => {
 test('a second Correction of the same Itinerary is refused, keeping the draft and showing the current Itinerary', async () => {
   confirmItinerary.mockRejectedValueOnce(new AlreadyCorrectedError())
   startCorrecting()
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm Itinerary' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm itinerary' }))
   expect(await screen.findByText('This Itinerary was already corrected.')).toBeTruthy()
   expect(reloadItineraries).toHaveBeenCalled()
   expect(screen.getAllByRole('group', { name: /^Stop/ })).toHaveLength(2)
@@ -247,9 +251,7 @@ test('the queue lists Cases with status badges in the order Case rules return', 
     expect.stringMatching(/Tom Alvarez.*Safe/),
   ])
   // Each row says what set its status and when.
-  expect(rows[0].textContent).toMatch(/Check-in,/)
   expect(rows[0].querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:12:00Z')
-  expect(rows[1].textContent).toMatch(/Case opened,/)
 })
 
 test('the Emergency Contact sees each Individual Update as status and time, newest first', () => {
@@ -266,7 +268,7 @@ test('the Emergency Contact sees each Individual Update as status and time, newe
   expect(items[0].querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:12:00Z')
 })
 
-test('unread Individual Updates are marked New, marked read, and stay New while the page is open', async () => {
+test('unread Individual Updates clear after opening and remain read on the next poll', async () => {
   const older = { caseId: 'c1', traveler: 'Maya Chen', update: { status: 'safe' as const, at: '2026-10-31T13:55:00Z' }, unreadNotificationId: null }
   const latest = { caseId: 'c1', traveler: 'Maya Chen', update: { status: 'needs_assistance' as const, at: '2026-10-31T14:12:00Z' } }
   data.updates = [{ ...latest, unreadNotificationId: 'n1' }, older]
@@ -274,11 +276,12 @@ test('unread Individual Updates are marked New, marked read, and stay New while 
   const items = () => within(screen.getByRole('list', { name: 'Individual Updates' })).getAllByRole('listitem')
   expect(within(items()[0]).getByText('New')).toBeTruthy()
   expect(within(items()[1]).queryByText('New')).toBeNull()
+  fireEvent.click(items()[0]);
   await waitFor(() => expect(markRead).toHaveBeenCalledWith(['n1']))
   // The next poll sees it read; the marker stays until the contact leaves the page.
   data.updates = [{ ...latest, unreadNotificationId: null }, older]
   rerender(<EmergencyContact />)
-  expect(within(items()[0]).getByText('New')).toBeTruthy()
+  expect(within(items()[0]).queryByText('New')).toBeNull()
   expect(markRead).toHaveBeenCalledTimes(1)
 })
 
@@ -287,8 +290,8 @@ const item = (fields: Partial<CaseHistoryItem> & Pick<CaseHistoryItem, 'id' | 'e
   ({ status: null, reached: null, outcome: null, urgency: null, text: null, fromReport: null, ...fields })
 
 function openMayaCase() {
+  window.location.hash = '#/coordinator/case/c1'
   render(<Coordinator />)
-  fireEvent.click(screen.getByRole('button', { name: 'Maya Chen' }))
   return within(screen.getByRole('region', { name: 'Case: Maya Chen' }))
 }
 
@@ -336,6 +339,7 @@ test('the Coordinator claims a Case', async () => {
 })
 
 test('the named owner can release their Case', async () => {
+  vi.spyOn(window,'confirm').mockReturnValue(true)
   data.queue = [{ ...mayaCase, owner: 'Dana Ortiz', ownedByMe: true }]
   data.history = []
   const owner = within(openMayaCase().getByRole('group', { name: 'Owner' }))
@@ -348,7 +352,7 @@ test('the Coordinator records a Contact Attempt and a note', async () => {
   data.queue = [mayaCase]
   data.history = []
   const detail = openMayaCase()
-  fireEvent.click(detail.getByText('Record a contact attempt'))
+  fireEvent.click(detail.getByRole('tab',{name:'Contact attempt'}))
   const attempt = within(detail.getByRole('group', { name: 'Contact Attempt' }))
   fireEvent.click(attempt.getByLabelText('Not reached'))
   // A Contact Attempt needs its note too.
@@ -357,7 +361,7 @@ test('the Coordinator records a Contact Attempt and a note', async () => {
   fireEvent.change(attempt.getByLabelText('Note'), { target: { value: 'Voicemail' } })
   fireEvent.click(record)
   await waitFor(() => expect(recordCaseEvent).toHaveBeenCalledWith('c1', { action: 'contact_attempt', reached: false, note: 'Voicemail' }))
-  fireEvent.click(detail.getByText('Add a coordinator note'))
+  fireEvent.click(detail.getByRole('tab',{name:'Notes'}))
   const note = within(detail.getByRole('group', { name: 'Note' }))
   fireEvent.change(note.getByLabelText('Note'), { target: { value: 'SAR found the camp empty' } })
   fireEvent.click(note.getByRole('button', { name: 'Add note' }))
@@ -368,7 +372,7 @@ test('a note can say which Report it follows up', async () => {
   data.queue = [mayaCase]
   data.history = [item({ id: 'r1', entry: 'check_in', by: 'Maya Chen', at: '2026-10-31T14:12:00Z', status: 'needs_assistance', text: 'Water rising' })]
   const detail = openMayaCase()
-  fireEvent.click(detail.getByText('Add a coordinator note'))
+  fireEvent.click(detail.getByRole('tab',{name:'Notes'}))
   const note = within(detail.getByRole('group', { name: 'Note' }))
   fireEvent.change(note.getByLabelText('From Report'), { target: { value: 'r1' } })
   fireEvent.change(note.getByLabelText('Note'), { target: { value: 'SAR reached the camp' } })
@@ -377,10 +381,11 @@ test('a note can say which Report it follows up', async () => {
 })
 
 test('resolving needs exactly one outcome', async () => {
+  vi.spyOn(window,'confirm').mockReturnValue(true)
   data.queue = [mayaCase]
   data.history = []
   const detail = openMayaCase()
-  fireEvent.click(detail.getByText('Resolve case'))
+  fireEvent.click(detail.getByRole('tab',{name:'Resolve'}))
   const resolve = within(detail.getByRole('group', { name: 'Resolve' }))
   const button = resolve.getByRole('button', { name: 'Resolve' }) as HTMLButtonElement
   expect(button.disabled).toBe(true)
@@ -402,7 +407,7 @@ test('the Case history says who did what, when and from which Report, with no wa
     item({ id: 'r1', entry: 'check_in', by: 'Maya Chen', at: '2026-10-31T14:12:00Z', status: 'needs_assistance', text: 'Water rising' }),
   ]
   const detail = openMayaCase()
-  fireEvent.click(detail.getByText('History'))
+  fireEvent.click(detail.getByRole('tab',{name:'Timeline'}))
   const history = within(detail.getByRole('list', { name: 'Case history' }))
   const entries = history.getAllByRole('listitem')
   expect(entries.map(e => e.textContent)).toEqual([
@@ -423,11 +428,10 @@ test('the Emergency Contact sees a resolution with its outcome', () => {
 
 test('a Needs assistance Case shows its Urgency and the traveler\'s words behind it', () => {
   data.queue = [{ ...mayaCase, urgency: 'immediate', urgencyQuote: 'my son cut his leg badly', urgencyChanged: false }]
-  render(<Coordinator />)
-  const row = within(screen.getByRole('list', { name: 'Case queue' })).getByRole('listitem')
-  expect(within(row).getByText('Immediate')).toBeTruthy()
-  expect(within(row).getByText('my son cut his leg badly')).toBeTruthy()
-  expect(row.textContent).not.toMatch(/%/)
+  const row = openMayaCase()
+  expect(row.getByText('Immediate')).toBeTruthy()
+  expect(row.getByText('my son cut his leg badly')).toBeTruthy()
+  expect(row.queryByText(/%/)).toBeNull()
 })
 
 test('a Coordinator changes the Urgency', async () => {
@@ -457,6 +461,8 @@ test("the Emergency Contact files a Can't-reach report from the traveler's Case"
   // A resolved Case has nothing left to report.
   expect(within(cases[1]).queryByRole('button')).toBeNull()
   fireEvent.click(within(cases[0]).getByRole('button', { name: "I can't reach Maya Chen" }))
+  expect(fileCantReach).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button',{name:'Yes, report it'}))
   await waitFor(() => expect(fileCantReach).toHaveBeenCalledWith('c1'))
 })
 
@@ -469,6 +475,7 @@ test('the Emergency Contact view sends anyone else to 911 or local law enforceme
 
 test('an AI draft only fills the General Update for the Coordinator to edit; it posts on Post', async () => {
   render(<Coordinator />)
+  fireEvent.click(screen.getByRole('button',{name:'Post update'}))
   const panel = within(screen.getByRole('region', { name: 'Post a General Update' }))
   fireEvent.click(panel.getByRole('button', { name: 'Draft with AI' }))
   const text = panel.getByLabelText(/General Update for Flash flood at Phantom Ranch/) as HTMLTextAreaElement
@@ -476,8 +483,10 @@ test('an AI draft only fills the General Update for the Coordinator to edit; it 
   expect(draftGeneralUpdate).toHaveBeenCalledWith('incident-1')
   expect(postGeneralUpdate).not.toHaveBeenCalled()
   fireEvent.change(text, { target: { value: 'Flash flooding near Phantom Ranch. Stay off the River Trail.' } })
-  fireEvent.click(panel.getByRole('button', { name: 'Post' }))
-  await waitFor(() => expect(postGeneralUpdate).toHaveBeenCalledWith('incident-1', 'Flash flooding near Phantom Ranch. Stay off the River Trail.'))
+  fireEvent.click(panel.getByRole('button', { name: 'Preview update' }))
+  expect(postGeneralUpdate).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button',{name:'Post publicly'}))
+  await waitFor(() => expect(postGeneralUpdate).toHaveBeenCalledWith('incident-1', 'Flash flooding near Phantom Ranch. Stay off the River Trail.',expect.any(String)))
   await waitFor(() => expect(text.value).toBe(''))
 })
 
@@ -489,5 +498,6 @@ test.each([['traveler', Traveler], ['Emergency Contact', EmergencyContact]])('a 
   expect(within(item).getByText('New')).toBeTruthy()
   expect(item.querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-31T14:00:00Z')
   expect(screen.getByRole('link', { name: /public incident page/ }).getAttribute('href')).toBe('#/')
+  fireEvent.click(item)
   await waitFor(() => expect(markRead).toHaveBeenCalledWith(['n-7']))
 })

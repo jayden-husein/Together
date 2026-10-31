@@ -1,3 +1,4 @@
+import { download } from '../lib/operations'
 import { toast } from '../components'
 import { useState } from 'react'
 import { inForce, isCurrent, lockedStops, withdraws } from '../../supabase/functions/_shared/itinerary'
@@ -13,6 +14,7 @@ export default function Itineraries({ data, error, onCorrect, onChange }: {
 }) {
   const current = data && inForce(data).filter(i => isCurrent(i.stops) && !(i.supersedes && withdraws(i.stops, Date.parse(i.at)))).sort((a, b) => compareTimes(b.at, a.at))
   // Kept here, not in the entry: a refused Withdraw reloads the list, and the entry leaves it.
+  const past = data && inForce(data).filter(i=>!isCurrent(i.stops))
   const [message, setMessage] = useState('')
   return <section className="panel">
     <h2>Your confirmed Itineraries</h2>
@@ -27,6 +29,7 @@ export default function Itineraries({ data, error, onCorrect, onChange }: {
         {current.map(itinerary => <Entry key={itinerary.id} itinerary={itinerary} onCorrect={() => onCorrect(itinerary)} onChange={onChange} onMessage={setMessage} />)}
       </ul>
     )}
+    {!!past?.length && <details><summary>Past trips ({past.length})</summary>{past.map(i=><div className="row" key={i.id}><Stops stops={i.stops}/></div>)}</details>}
   </section>
 }
 
@@ -52,7 +55,8 @@ function Entry({ itinerary, onCorrect, onChange, onMessage: setMessage }: {
     <Stops stops={itinerary.stops} />
     <StopsMap stops={itinerary.stops} />
     {itinerary.originalText && <details><summary>Your pasted plans</summary><blockquote>{itinerary.originalText}</blockquote></details>}
-    <div><button className="button" type="button" disabled={withdrawing} onClick={onCorrect}>Correct</button>
+    <button className="button" type="button" onClick={()=>{const stamp=(at:string)=>new Date(at).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');const events=itinerary.stops.map((s,i)=>['BEGIN:VEVENT',`UID:${itinerary.id}-${i}@together`,`DTSTAMP:${stamp(new Date().toISOString())}`,`DTSTART:${stamp(s.start)}`,`DTEND:${stamp(s.end)}`,`SUMMARY:${s.place}`,`LOCATION:${s.place}`,'END:VEVENT'].join('\r\n')).join('\r\n');download('together-itinerary.ics',`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Together//Simulation//EN\r\n${events}\r\nEND:VCALENDAR\r\n`,'text/calendar')}}>Add to calendar</button>
+    <div className="actions"><button className="button" type="button" disabled={withdrawing} onClick={onCorrect}>Correct</button>
       <button className="button" type="button" disabled={withdrawing} onClick={() => void withdraw()}>Withdraw</button></div>
   </li>
 }

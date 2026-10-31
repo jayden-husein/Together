@@ -133,8 +133,9 @@ test('Coordinator statistics use Incident IDs and resolution requires confirmati
   expect(within(controls).getByRole('list', { name: 'Incident Case statistics' }).textContent).toContain('1Unconfirmed')
   fireEvent.click(screen.getByRole('button', { name: 'Resolve Incident' }))
   expect(resolve).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText('Reason'),{target:{value:'All cases reviewed'}})
   fireEvent.click(screen.getByRole('button', { name: 'Confirm resolution' }))
-  await waitFor(() => expect(resolve).toHaveBeenCalledWith('one'))
+  await waitFor(() => expect(resolve).toHaveBeenCalledWith('one','All cases reviewed','assistance_provided'))
 })
 
 test('public visitors see no Coordinator controls or Case statistics', () => {

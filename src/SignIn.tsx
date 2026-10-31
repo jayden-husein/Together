@@ -1,5 +1,6 @@
-import { createContext, type ReactNode, useContext, useEffect, useState } from 'react'
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { actionEvent } from './lib/analytics'
 import { supabase } from './lib/supabase'
 import { type Capabilities, homeRoute } from './lib/access'
 
@@ -7,12 +8,17 @@ export type Account = { session: Session | null | undefined; capabilities: Capab
 const AccountContext = createContext<Account>({ session: null, capabilities: null, error: false, signOut: async () => {} })
 export const useAccount = () => useContext(AccountContext)
 export function AccountProvider({ children }: { children: ReactNode }) {
+  const currentId = useRef<string | null>(null)
+  const explicitSignOut = useRef(false)
   const [session, setSession] = useState<Session | null>()
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null)
   const [error, setError] = useState(false)
   useEffect(() => {
     let generation = 0
     const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      if (!next && currentId.current && !explicitSignOut.current) window.dispatchEvent(new Event('together:expired'))
+      if (next?.user.id && currentId.current === next.user.id) { setSession(next); return }
+      currentId.current = next?.user.id ?? null
       const version = ++generation
       setSession(next)
       setCapabilities(null)
@@ -24,12 +30,14 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         if (version !== generation) return
         if (error || !c) { setError(true); return }
         setCapabilities(c)
-        if (event === 'SIGNED_IN') window.location.hash = homeRoute(c)
+        if (event === 'SIGNED_IN') { actionEvent('sign_in'); window.location.hash = homeRoute(c); void supabase.rpc('record_sign_in') }
+        explicitSignOut.current = false
       })
     })
     return () => { generation++; data.subscription.unsubscribe() }
   }, [])
   async function signOut() {
+    explicitSignOut.current = true
     // Unmount all private views before awaiting network cleanup.
     setSession(null); setCapabilities(null)
     const accountId = session?.user.id

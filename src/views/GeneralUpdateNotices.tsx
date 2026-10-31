@@ -9,7 +9,7 @@ export default function GeneralUpdateNotices() {
   useEffect(()=>{setShown(prev=>[...(data??[]),...prev.filter(s=>!data?.some(n=>n.notificationId===s.notificationId))])},[data])
   async function mark(id:string) {try{await markNotificationsRead([id]);setRead(prev=>new Set([...prev,id]))}catch{/* Retry on next visibility change. */}}
   return <section className="panel notices" aria-labelledby="notices-heading"><h2 id="notices-heading"><Icon name="megaphone"/> General Updates</h2>
-    {!data&&!shown.length?<Skeleton/>:!shown.length?<p className="empty">No General Updates yet.</p>:<ul className="rows" aria-label="New General Updates">{shown.map(n=><Notice key={n.notificationId} n={n} unread={!read.has(n.notificationId)} mark={()=>void mark(n.notificationId)}/>)}</ul>}
+    {!data&&!shown.length?<Skeleton/>:!shown.length?<p className="empty">No General Updates yet.</p>:<ul className="rows" aria-label="New General Updates">{shown.map(n=><Notice key={n.notificationId} n={n} unread={n.unread !== false && !read.has(n.notificationId)} mark={()=>void mark(n.notificationId)}/>)}</ul>}
     <a href="#/">See every General Update on the public incident page</a>
   </section>
 }

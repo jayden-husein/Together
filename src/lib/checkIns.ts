@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { caseStatus, caseUrgency, compareTimes, individualUpdateView, orderQueue, statusConflict, type CaseHistoryEntry, type CaseStatus, type Outcome, type Urgency, type UrgencyEntry } from './caseRules'
 import { inForce, withdraws, type Stop } from '../../supabase/functions/_shared/itinerary'
 import { nearestResourceFor, type Resource } from '../../supabase/functions/_shared/resources'
+import { actionEvent } from './analytics'
 import { supabase } from './supabase'
 
 export type CheckInStatus = 'safe' | 'needs_assistance'
@@ -160,6 +161,7 @@ export async function submitCheckIn(caseId: string, status: CheckInStatus, descr
     p_case_id: caseId, p_status: status, p_description: description ?? null,
   }).throwOnError()
   window.dispatchEvent(new Event('together:data'))
+  actionEvent('check_in')
   // The Check-in is saved either way; until the AI proposes an Urgency, or if it can't, the Case is Untriaged.
   if (status === 'needs_assistance') void supabase.functions.invoke('triage-check-in', { body: { caseId } })
 }
@@ -173,7 +175,7 @@ type QueueRow = {
   reports: { id: string; kind: 'cant_reach' | 'check_in'; body: { status?: CheckInStatus }; created_at: string }[]
   opening?: { note: string | null; reports: { id: string; original_text: string | null; body: { stops: Stop[] } } | null }[]
   case_events: {
-    action: 'claimed' | 'released' | 'resolved' | 'contact_attempt' | UrgencyEntry['action']; reached?: boolean; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome']
+    action: 'claimed' | 'released' | 'resolved' | 'contact_attempt' | UrgencyEntry['action']; reached?: boolean; assigned_to?: string; actor: string | null; created_at: string; outcome: CaseHistoryEntry['outcome']
     urgency: Urgency | null; note: string | null; source_report_id: string | null
   }[]
 }
@@ -210,7 +212,7 @@ async function queue(includeResolvedIncidents = false): Promise<QueueCase[]> {
   if (!coordinator) throw new Error('A Coordinator account is required.')
   const rows = await readPages((from, to) => {
     let query = supabase.from('cases').select(
-    'id, incident_id, created_at, persons!inner(name), incidents!inner(name,resolved_at), reports(id, kind, body, created_at), case_events(action, actor, created_at, outcome, urgency, note, source_report_id), opening:case_events(note, reports(id, original_text, body))',
+    'id, incident_id, created_at, persons!inner(name), incidents!inner(name,resolved_at), reports(id, kind, body, created_at), case_events(action, actor, assigned_to, reached, created_at, outcome, urgency, note, source_report_id), opening:case_events(note, reports(id, original_text, body))',
   ).in('reports.kind', ['check_in', 'cant_reach']).in('case_events.action', ['claimed', 'released', 'resolved', 'contact_attempt', 'urgency_proposed', 'urgency_changed']).eq('opening.action', 'opened')
     .order('created_at', { referencedTable: 'reports', ascending: false })
     .order('created_at', { referencedTable: 'case_events', ascending: false })
@@ -241,8 +243,8 @@ async function queue(includeResolvedIncidents = false): Promise<QueueCase[]> {
       .filter(e => e.action === 'claimed' || e.action === 'released')
       .sort((a, b) => compareTimes(b.created_at, a.created_at))[0]
     const claim = assignment?.action === 'claimed' ? assignment : undefined
-    const owner = claim ? names(claim.actor) : null
-    const ownedByMe = !!claim?.actor && claim.actor === session?.user.id
+    const owner = claim ? names(claim.assigned_to ?? claim.actor) : null
+    const ownedByMe = !!claim && (claim.assigned_to ?? claim.actor) === session?.user.id
     // Needs assistance is set by the latest Report, which is that Check-in.
     const checkIn = status.status === 'needs_assistance' ? row.reports[0] : undefined
     const triage = checkIn && caseUrgency({ id: checkIn.id, at: checkIn.created_at }, row.case_events.flatMap(e =>
@@ -293,6 +295,7 @@ async function contactCases(): Promise<ContactCase[]> {
     if (!Array.isArray(data)) throw new Error('Expected a list of Cases.')
     return { data: data as Row[] }
   })
+  const { data: ownReports } = await supabase.rpc('my_open_contact_reports').throwOnError()
   const incidentIds = [...new Set(rows.map(r => r.incident_id))]
   const { data: incidents } = await supabase.from('incidents').select('id, name').in('id', incidentIds).throwOnError()
   const names = new Map(incidents.map(i => [i.id as string, i.name as string]))
@@ -300,6 +303,7 @@ async function contactCases(): Promise<ContactCase[]> {
   for (const row of rows) byCase.set(row.case_id, [...byCase.get(row.case_id) ?? [], row])
   return [...byCase.values()].map(entries => ({
     caseId: entries[0].case_id, traveler: entries[0].person_name, incident: names.get(entries[0].incident_id) ?? 'Incident',
+    openReport: ownReports?.find((r: {case_id:string}) => r.case_id===entries[0].case_id) ? {id:ownReports.find((r: {case_id:string})=>r.case_id===entries[0].case_id).id,at:ownReports.find((r: {case_id:string})=>r.case_id===entries[0].case_id).created_at} : undefined,
     at: entries.at(-1)?.at, safeAt: entries.filter(e => e.status === 'safe').at(-1)?.at,
     ...caseStatus(entries),
   })).reverse()
@@ -310,6 +314,7 @@ export function useContactCases() { return usePoll(contactCases) }
 export async function fileCantReach(caseId: string) {
   const { data } = await supabase.rpc('file_cant_reach', { p_case_id: caseId, p_confirmed: true }).throwOnError()
   window.dispatchEvent(new Event('together:data'))
+  actionEvent('report')
   return data as string
 }
 
@@ -389,6 +394,8 @@ export async function recordCaseEvent(caseId: string, event: CoordinatorAction) 
     p_source_report_id: 'fromReport' in event ? event.fromReport ?? null : null,
     p_urgency: 'urgency' in event ? event.urgency : null,
   }).throwOnError()
+  if(event.action === 'claimed') actionEvent('claim')
+  if(event.action === 'resolved') actionEvent('resolve')
 }
 export function useIndividualUpdates() { return usePoll(individualUpdates) }
 
@@ -438,6 +445,7 @@ export function useGeneralUpdates(incidentId: string | undefined) {
 // Refused by the database unless the signed-in Account is a Coordinator.
 export async function postGeneralUpdate(incidentId: string, body: string, requestId?: string) {
   await supabase.from('general_updates').insert({ incident_id: incidentId, body, request_id: requestId }).throwOnError()
+  actionEvent('post_update')
 }
 // The AI's draft for the Coordinator to edit. It is only text: posting is always postGeneralUpdate.
 export async function draftGeneralUpdate(incidentId: string): Promise<string> {
@@ -448,10 +456,10 @@ export async function draftGeneralUpdate(incidentId: string): Promise<string> {
   throw new Error(typeof detail?.message === 'string' ? detail.message.replace(/\.$/, '') : 'check your connection and try again')
 }
 // A General Update delivered to the signed-in Account as a Notification it hasn't read yet.
-export type GeneralUpdateNotice = { notificationId: string; incident: string; body: string; at: string }
+export type GeneralUpdateNotice = { unread?: boolean; notificationId: string; incident: string; body: string; at: string }
 async function generalUpdateNotices(): Promise<GeneralUpdateNotice[]> {
-  const unread = await readPages((from, to) => supabase.from('notifications').select('id, refers_to')
-    .eq('kind', 'general_update').is('read_at', null).order('created_at', { ascending: false }).order('id').range(from, to).throwOnError())
+  const unread = await readPages((from, to) => supabase.from('notifications').select('id, refers_to, read_at')
+    .eq('kind', 'general_update').order('created_at', { ascending: false }).order('id').range(from, to).throwOnError())
   if (!unread.length) return []
   // ponytail: one `in` list; the view marks notices read as they arrive, so few are ever unread at once.
   const { data } = await supabase.from('general_updates').select('id, body, created_at, incidents!inner(name)').in('id', unread.map(n => n.refers_to))
@@ -459,7 +467,7 @@ async function generalUpdateNotices(): Promise<GeneralUpdateNotice[]> {
   const posts = new Map(data.map(u => [u.id, u]))
   return unread.flatMap(n => {
     const post = posts.get(n.refers_to)
-    return post ? [{ notificationId: n.id, incident: post.incidents.name, body: post.body, at: post.created_at }] : []
+    return post ? [{ unread: !n.read_at, notificationId: n.id, incident: post.incidents.name, body: post.body, at: post.created_at }] : []
   })
 }
 export function useGeneralUpdateNotices() { return usePoll(generalUpdateNotices) }
@@ -473,8 +481,8 @@ async function coordinatorIncidentCases() {
   return coordinator ? [{ cases: await queue(true) }] : []
 }
 export function useCoordinatorIncidentCases() { return usePoll(coordinatorIncidentCases) }
-export async function resolveIncident(id: string) {
-  await supabase.rpc('resolve_incident', { p_incident: id }).throwOnError()
+export async function resolveIncident(id: string, reason: string, outcome: Outcome) {
+  await supabase.rpc('resolve_incident', { p_incident: id, p_reason: reason, p_outcome: outcome }).throwOnError()
 }
 
 export async function cancelCantReach(reportId: string) { await supabase.rpc('cancel_cant_reach', { p_report_id: reportId }).throwOnError() }

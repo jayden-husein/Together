@@ -43,7 +43,7 @@ export default function EmergencyContact() {
         // Status or Urgency, and time only (Case rules: Individual Update view), newest first.
         <ul className="rows" aria-label="Individual Updates">
           {data.slice(0,100).map(entry => (
-            <ReadUpdate entry={entry} key={key(entry)}><li className={'status' in entry.update ? `row ${statusClass(entry.update.status)}` : 'row'} key={key(entry)}>
+            <ReadUpdate entry={entry} key={key(entry)}><div className={'status' in entry.update ? `row ${statusClass(entry.update.status)}` : 'row'} key={key(entry)}>
               <div className="row-main">
                 <span className="row-name">{entry.traveler}</span>
                 {entry.unreadNotificationId && <span className="new">New</span>}
@@ -52,7 +52,7 @@ export default function EmergencyContact() {
                   : <span>Urgency: <UrgencyTag urgency={entry.update.urgency} /></span>}
               </div>
               {entry.cause && <p>{entry.cause}</p>}<SourceLine source="Individual Update" at={entry.update.at} />
-            </li></ReadUpdate>
+            </div></ReadUpdate>
           ))}
         </ul>
       )}
@@ -63,7 +63,7 @@ export default function EmergencyContact() {
 
 function CaseRow({ c, onFiled }: { c: ContactCase; onFiled: () => void }) {
   const [confirming, setConfirming] = useState(false)
-  const [report, setReport] = useState<{id:string; at:number}>()
+  const [report, setReport] = useState<{id:string; at:number} | undefined>(() => c.openReport ? {id:c.openReport.id,at:Date.parse(c.openReport.at)} : undefined)
   const [now, setNow] = useState(Date.now())
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
   const [sending, setSending] = useState(false)
@@ -91,7 +91,7 @@ function CaseRow({ c, onFiled }: { c: ContactCase; onFiled: () => void }) {
       </div>
       <p>{c.incident}</p>
       {/* Nothing to add once the Case is resolved or already says Can't reach. */}
-      {c.status !== 'resolved' && c.status !== 'cant_reach' && (
+      {c.status !== 'resolved' && !c.openReport && !report && (
         <button type="button" className="button danger-outline" disabled={sending} onClick={() => setConfirming(true)}>I can't reach {c.traveler}</button>
       )}
       {confirming && <Dialog title={`Report that you can't reach ${c.traveler}?`} onClose={() => setConfirming(false)}>
@@ -105,13 +105,14 @@ function CaseRow({ c, onFiled }: { c: ContactCase; onFiled: () => void }) {
 }
 
 function ReadUpdate({entry, children}:{entry:IndividualUpdate; children:ReactNode}) {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLLIElement>(null)
+  const [read,setRead]=useState(false)
   useEffect(() => {
     if (!entry.unreadNotificationId || !ref.current || typeof IntersectionObserver === 'undefined') return
     let timer: ReturnType<typeof setTimeout> | undefined
-    const observer = new IntersectionObserver(([e]) => { clearTimeout(timer); if (e.isIntersecting) timer=setTimeout(() => { void markIndividualUpdatesRead([entry.unreadNotificationId!]); observer.disconnect() },2000) },{threshold:.6})
+    const observer = new IntersectionObserver(([e]) => { clearTimeout(timer); if (e.isIntersecting) timer=setTimeout(() => { void markIndividualUpdatesRead([entry.unreadNotificationId!]).then(()=>setRead(true)); observer.disconnect() },2000) },{threshold:.6})
     observer.observe(ref.current)
     return () => { clearTimeout(timer); observer.disconnect() }
   },[entry.unreadNotificationId])
-  return <div ref={ref} onClick={() => { if(entry.unreadNotificationId) void markIndividualUpdatesRead([entry.unreadNotificationId]) }}>{children}</div>
+  return <li className={read?'read-update':undefined} ref={ref} onClick={() => { if(entry.unreadNotificationId) void markIndividualUpdatesRead([entry.unreadNotificationId]).then(()=>setRead(true)) }}>{children}</li>
 }

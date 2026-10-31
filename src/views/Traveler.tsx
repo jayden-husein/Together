@@ -1,3 +1,4 @@
+import { useConnections } from '../lib/operations'
 import { useAccount } from '../SignIn'
 import { toast } from '../components'
 import GeneralUpdateNotices from './GeneralUpdateNotices'
@@ -10,6 +11,7 @@ import { CheckInButtons, ResourceSource, SimulationLabel, SourceLine, StatusBadg
 
 export default function Traveler() {
   const account = useAccount()
+  const connections=useConnections()
   const { data, error } = useMyCheckIns()
   const itineraries = useMyItineraries()
   // The Itinerary being corrected; `form` changes to start the form afresh on Correct or Cancel.
@@ -30,6 +32,7 @@ export default function Traveler() {
       ) : (
         data.map(request => <Request key={request.caseId} request={request} />)
       )}
+      <section className="panel"><h2>Who can see my status</h2><p>{connections.data?.[0]?.contacts.map(c=>c.name).join(', ') || 'No Emergency Contacts added yet.'}</p><p className="lede">Emergency Contacts see your status and outcomes. Notes stay with Coordinators.</p><a href="#/account">Manage emergency contacts</a></section>
       <Itinerary key={form} correcting={correcting} onCancel={() => restart(null)}
         onConfirmed={() => { setCorrecting(null); itineraries.reload() }} onAlreadyCorrected={itineraries.reload} />
       <Itineraries data={itineraries.data} error={itineraries.error} onCorrect={restart} onChange={itineraries.reload} />
@@ -49,6 +52,8 @@ function Request({ request }: { request: CheckInRequest }) {
 
   async function send(status: CheckInStatus) {
     if (sending) return // A double tap would store two Check-ins.
+    const previous=answer
+    setAnswer(status);setChanging(false)
     setSending(true)
     setMessage(undefined)
     try {
@@ -60,6 +65,7 @@ function Request({ request }: { request: CheckInRequest }) {
       }
       setMessage({ text: 'Check-in sent.' }); setAnswer(status); setChanging(false); toast('Check-in sent')
     } catch (e) {
+      setAnswer(previous);setChanging(true);toast('Could not send check-in. Please retry.')
       // Keep the description so nothing they typed is lost; they can send again.
       setMessage({ text: 'Could not send your check-in. Retry when connected.', failed: true })
     } finally {
