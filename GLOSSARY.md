@@ -1,6 +1,6 @@
 # Together
 
-A disaster accountability map: it gathers trip plans, check-ins, family reports and venue records about people who may be caught in an incident, so they can be followed up and their families kept informed.
+A disaster accountability map: it gathers trip plans, check-ins and consented venue records about people who may be caught in an incident, so they can be followed up and their families kept informed.
 
 ## People and roles
 
