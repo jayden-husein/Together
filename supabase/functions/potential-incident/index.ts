@@ -1,13 +1,13 @@
 import OpenAI from 'openai'
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0'
-import { draftFlood, floodReadings } from '../_shared/flood.ts'
+import { draftFlood, fixturePacket, type Reading } from '../_shared/flood.ts'
 import { match } from '../_shared/match.ts'
 import { inForce } from '../_shared/itinerary.ts'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type' }
 const reply = (status: number, message: string) => Response.json({ message }, { headers, status })
 
-async function summarize(readings: ReturnType<typeof floodReadings>) {
+async function summarize(readings: Reading[]) {
   // GPT-6 Luna through Dartmouth Chat's OpenAI-compatible API; draftFlood checks every quote it returns.
   const dartmouth = new OpenAI({ apiKey: Deno.env.get('DARTMOUTH_CHAT_API_KEY'), baseURL: 'https://chat.dartmouth.edu/api', timeout: 15_000, maxRetries: 0 })
   const completion = await dartmouth.chat.completions.create({
@@ -19,7 +19,7 @@ async function summarize(readings: ReturnType<typeof floodReadings>) {
     } } },
     messages: [
       { role: 'system', content: 'Summarize these synthetic flood readings for a Coordinator. Return only JSON with a short summary string and quotes, an array of one exact nonempty excerpt per reading in the supplied order.' },
-      { role: 'user', content: JSON.stringify([readings.gauge, readings.warning, readings.news].map(({ name, text }) => ({ name, text }))) },
+      { role: 'user', content: JSON.stringify(readings.map(({ name, text }) => ({ name, text }))) },
     ],
   })
   const choice = completion.choices[0]
@@ -47,6 +47,7 @@ async function verify(db: SupabaseClient, account: string, id: string, start: st
     const { error } = await db.rpc('verify_potential_incident', { p_id: id, p_account: account,
       p_start: start, p_end: end, p_matches: matches, p_report_count: count })
     if (!error) return reply(200, 'Incident verified.')
+    if (error.code === 'P0409') return reply(409, 'This Potential incident was dismissed.')
     if (error.code !== '40001') throw error
   }
   return reply(409, 'Itineraries changed. Try verifying again.')
@@ -65,19 +66,16 @@ Deno.serve(async request => {
     if (!coordinator) return reply(403, 'A Coordinator account is required.')
     const body = await request.json().catch(() => null)
     if (body?.action === 'ingest' && coordinator.demo) {
-      // This feed accepts only the three synthetic fixture readings.
-      const readings = floodReadings()
-      const packet = body.readings
-      if (!packet || !(['gauge', 'warning', 'news'] as const).every(key =>
-        packet[key]?.name === readings[key].name && packet[key].text === readings[key].text) ||
-        packet.warning.area?.type !== 'Polygon' ||
-        JSON.stringify(packet.warning.area.coordinates) !== JSON.stringify(readings.warning.area.coordinates)) {
-        return reply(400, 'Unknown source packet.')
-      }
-      const draft = await draftFlood(packet, () => summarize(packet))
-      const { data } = await db.from('potential_incidents').insert({ ...draft, name: 'Flash flood at Phantom Ranch',
-        starts_at: new Date(Date.now() - 30 * 60000).toISOString(), demo: true }).select('id').single().throwOnError()
-      return Response.json(data, { headers })
+      const packet = fixturePacket(body.readings)
+      if (!packet) return reply(400, 'Unknown source packet.')
+      // ponytail: reads every earlier Potential incident; filter by source name if the feed becomes real.
+      const { data: earlier } = await db.from('potential_incidents').select('id,sources,dismissed_at,incident_id').throwOnError()
+      const draft = await draftFlood(packet, earlier, () => summarize(packet.readings))
+      if (!draft) return Response.json({ id: null }, { headers })
+      // A simultaneous duplicate delivery meets readings_key and raises nothing.
+      const { data } = await db.from('potential_incidents').upsert({ ...draft, name: 'Flash flood at Phantom Ranch', demo: true },
+        { onConflict: 'readings_key', ignoreDuplicates: true }).select('id').maybeSingle().throwOnError()
+      return Response.json({ id: data?.id ?? null }, { headers })
     }
     if (body?.action !== 'verify' || typeof body.id !== 'string') return reply(400, 'Invalid review.')
     const { start, end } = body

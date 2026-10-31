@@ -1,7 +1,7 @@
-import PotentialIncidentReview from './PotentialIncidentReview'
+import PotentialIncidentReview, { DismissalLine } from './PotentialIncidentReview'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
-import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
-import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, Stops, UrgencyTag, formatTime, statusClass } from '../ui'
+import { type CaseHistoryItem, type CoordinatorAction, type QueueCase, recordCaseEvent, useDismissedIncidents, usePendingIncidents, useCaseHistory, useQueue } from '../lib/checkIns'
+import { type CaseStatus, OUTCOME_LABEL, type Outcome, SourceLine, StatusBadge, UrgencyTag, formatTime, statusClass } from '../ui'
 
 // Queue order, so the summary reads the same way as the list below it.
 const STATUSES: CaseStatus[] = ['needs_assistance', 'cant_reach', 'unconfirmed', 'safe', 'resolved']
@@ -14,6 +14,7 @@ const SOURCE: Record<CaseStatus, string> = {
 export default function Coordinator() {
   const { data, error, reload } = useQueue()
   const pending = usePendingIncidents()
+  const dismissed = useDismissedIncidents()
   const [selected, setSelected] = useState<string>()
   const cases = data ?? []
   const open = cases.find(c => c.caseId === selected)
@@ -31,7 +32,13 @@ export default function Coordinator() {
         </ul>
       </header>
       {pending.error && <p role="alert">{pending.error}</p>}
-      {pending.data?.map(draft => <PotentialIncidentReview key={draft.id} draft={draft} onVerify={() => { pending.reload(); reload() }} />)}
+      {pending.data?.map(draft => <PotentialIncidentReview key={draft.id} draft={draft} onDecided={() => { pending.reload(); dismissed.reload(); reload() }} />)}
+      {dismissed.data?.length ? <section className="panel potential-review">
+        <h2>Dismissed Potential incidents</h2>
+        <ul className="rows" aria-label="Dismissed Potential incidents">
+          {dismissed.data.map(d => <li className="row" key={d.id}><span className="row-name">{d.name}</span><DismissalLine dismissal={d} /></li>)}
+        </ul>
+      </section> : null}
       {error && <p role="alert">{error}</p>}
       {!data ? (
         !error && <p className="empty">Loading…</p>
