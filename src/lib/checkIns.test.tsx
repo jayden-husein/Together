@@ -19,11 +19,13 @@ vi.mock('./supabase', async () => {
         id: String(offset + i), created_at: '2026-10-31T05:00:00Z', persons: { name: 'Traveler' }, incidents: { name: 'Flood' },
         // Newest first, as requested: Dana took over Case 1 from another Coordinator.
         case_events: offset + i === 1 ? [
+          { action: 'opened', actor: null, created_at: '2026-10-31T05:00:00Z', outcome: null },
           { action: 'claimed', actor: 'acct-dana', created_at: '2026-10-31T05:20:00Z', outcome: null },
           { action: 'claimed', actor: 'acct-lee', created_at: '2026-10-31T05:10:00Z', outcome: null },
         ] : offset + i === 100 ? [
-          { action: 'released', actor: 'acct-dana', created_at: '2026-10-31T05:20:00Z', outcome: null },
+          { action: 'opened', actor: null, created_at: '2026-10-31T05:00:00Z', outcome: null },
           { action: 'claimed', actor: 'acct-dana', created_at: '2026-10-31T05:10:00Z', outcome: null },
+          { action: 'released', actor: 'acct-dana', created_at: '2026-10-31T05:20:00Z', outcome: null },
         ] : [],
         reports: offset + i === 100 ? [{ kind: 'check_in', body: { status: 'needs_assistance' }, created_at: '2026-10-31T06:00:00Z' }] : [],
       }))

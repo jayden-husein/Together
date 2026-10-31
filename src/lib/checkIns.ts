@@ -156,9 +156,11 @@ async function queue(): Promise<QueueCase[]> {
     const resolutions = row.case_events.filter(e => e.action === 'resolved')
     for (const event of resolutions) history.push({ at: event.created_at, outcome: event.outcome, status: 'resolved' })
     const status = caseStatus(history)
-    // Case events come newest first, so the first one found is the latest.
+    // Select ownership explicitly, even when embedded events arrive unfiltered or unordered.
     const at = status.status === 'resolved' ? resolutions[0]?.created_at : row.reports[0]?.created_at
-    const assignment = row.case_events.find(e => e.action !== 'resolved')
+    const assignment = row.case_events
+      .filter(e => e.action === 'claimed' || e.action === 'released')
+      .sort((a, b) => compareTimes(b.created_at, a.created_at))[0]
     const claim = assignment?.action === 'claimed' ? assignment : undefined
     const owner = claim ? names(claim.actor) : null
     const ownedByMe = !!claim?.actor && claim.actor === session?.user.id
