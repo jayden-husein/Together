@@ -1,0 +1,108 @@
+/*
+  Together design tokens. Every color, type size, space and radius in the app comes from here.
+
+  - Components use these custom properties only: never a hex, px or rem literal in a component rule.
+    Missing a role? Add a token here (in both the light and dark blocks for colors), not a one-off value.
+  - Colors are named by role, not hue. Status and Urgency use the same five roles:
+      neutral  Unconfirmed, Can wait, Untriaged
+      danger   Needs assistance, Immediate
+      warning  Can't reach, Urgent
+      success  Safe
+      info     Resolved
+    Each role has -bg (badge fill) and -fg (text on that fill or on surface); danger and success also
+    have -solid for the Check-in buttons. Color never carries meaning alone: always pair it with the label.
+  - src/tokens.test.ts checks every text/background pair against WCAG AA in both modes. Run it after
+    changing any color.
+  - Shared components live in src/ui.tsx: SimulationLabel, StatusBadge, UrgencyTag, CheckInButtons, SourceLine.
+*/
+
+:root {
+  color-scheme: light dark;
+
+  --color-bg: #f4f7fb;
+  --color-surface: #ffffff;
+  --color-border: #d3d8de;
+  --color-border-strong: #727c86;
+  --color-text: #182230;
+  --color-text-secondary: #4f5966;
+  --color-focus: #1e5ba1;
+
+  --color-primary-solid: #182230;
+  --color-on-primary: #ffffff;
+  --color-on-solid: #ffffff;
+
+  --color-neutral-bg: #e3e8ee;
+  --color-neutral-fg: #444e5b;
+  --color-danger-bg: #ffe7e4;
+  --color-danger-fg: #a92321;
+  --color-danger-solid: #be2323;
+  --color-warning-bg: #ffecc9;
+  --color-warning-fg: #824c11;
+  --color-success-bg: #dcf7e1;
+  --color-success-fg: #196632;
+  --color-success-solid: #137738;
+  --color-info-bg: #e2f0ff;
+  --color-info-fg: #1e5ba1;
+
+  /* Atkinson Hyperlegible Next: drawn for low-vision readers. System UI if it can't load. */
+  --font-body: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+
+  /* Type scale: size / line-height pairs by role. */
+  --text-sm: 0.875rem;   /* captions, source and time lines */
+  --text-base: 1rem;     /* body, inputs (16px stops iOS input zoom) */
+  --text-lg: 1.25rem;    /* section headings, Check-in button labels */
+  --text-xl: 1.625rem;   /* page headings */
+  --leading-tight: 1.2;
+  --leading-body: 1.5;
+  --weight-regular: 400;
+  --weight-bold: 700;
+  --tracking-heading: -0.01em;
+
+  /* Spacing: 4px steps. Gap between groups is at least twice the gap within one. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius-sm: 0.25rem;  /* Urgency tags, Simulation label */
+  --radius-md: 0.5rem;   /* buttons, cards */
+  --radius-pill: 999px;  /* status badges */
+  --border-width: 1px;
+  --focus-width: 3px;
+  --focus-offset: 2px;
+
+  --tap-min: 3.5rem;     /* Check-in buttons: 56px, above the 48px floor */
+  --measure: 36rem;      /* max width of a single reading column */
+  --map-min-height: 18rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #10171f;
+    --color-surface: #1b222c;
+    --color-border: #313942;
+    --color-border-strong: #737b86;
+    --color-text: #ebeff4;
+    --color-text-secondary: #b0b8c1;
+    --color-focus: #a3cffd;
+
+    --color-primary-solid: #ebeff4;
+    --color-on-primary: #10171f;
+    --color-on-solid: #ffffff;
+
+    --color-neutral-bg: #2a313a;
+    --color-neutral-fg: #c7cfd7;
+    --color-danger-bg: #4e201e;
+    --color-danger-fg: #ffb4ad;
+    --color-danger-solid: #be2323;
+    --color-warning-bg: #402c12;
+    --color-warning-fg: #f4ca84;
+    --color-success-bg: #1a3520;
+    --color-success-fg: #95dfa4;
+    --color-success-solid: #137738;
+    --color-info-bg: #1e3149;
+    --color-info-fg: #a3cffd;
+  }
+}

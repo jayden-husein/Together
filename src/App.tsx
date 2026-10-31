@@ -1,30 +1,52 @@
-import { useState } from 'react'
-import type { LatLngTuple } from 'leaflet'
-import { MapContainer, TileLayer } from 'react-leaflet'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { SimulationLabel } from './ui'
+import Coordinator from './views/Coordinator'
+import EmergencyContact from './views/EmergencyContact'
+import PublicIncident from './views/PublicIncident'
+import Traveler from './views/Traveler'
 
-const GRAND_CANYON: LatLngTuple = [36.1, -112.1]
+// Hash routing: no server rewrites needed on Vercel. The first route is the fallback.
+const ROUTES = [
+  { hash: '#/', label: 'Incident', View: PublicIncident },
+  { hash: '#/traveler', label: 'Traveler', View: Traveler },
+  { hash: '#/contact', label: 'Emergency Contact', View: EmergencyContact },
+  { hash: '#/coordinator', label: 'Coordinator', View: Coordinator },
+]
+
+const subscribe = (onChange: () => void) => {
+  window.addEventListener('hashchange', onChange)
+  return () => window.removeEventListener('hashchange', onChange)
+}
 
 export default function App() {
-  const [tilesFailed, setTilesFailed] = useState(false)
+  const hash = useSyncExternalStore(subscribe, () => window.location.hash)
+  const route = ROUTES.find(r => r.hash === hash) ?? ROUTES[0]
+  const main = useRef<HTMLElement>(null)
+  const firstRender = useRef(true)
+
+  // A hash change resets nothing for assistive tech: retitle the page and move focus to the new view.
+  useEffect(() => {
+    document.title = `${route.label} – Together`
+    if (firstRender.current) firstRender.current = false
+    else main.current?.focus()
+  }, [route])
 
   return (
-    <main className="page">
-      <header>
-        <h1>Grand Canyon incident</h1>
-        <span className="simulation">Simulation</span>
+    <div className="shell">
+      <header className="app-header">
+        <a className="wordmark" href="#/">Together</a>
+        <SimulationLabel />
+        <nav aria-label="Views">
+          {ROUTES.map(r => (
+            <a key={r.hash} href={r.hash} aria-current={r === route ? 'page' : undefined}>
+              {r.label}
+            </a>
+          ))}
+        </nav>
       </header>
-      {tilesFailed && (
-        <section className="tile-error" role="status">
-          <p>The map couldn't load. A list of the incident's places will appear here.</p>
-        </section>
-      )}
-      <MapContainer className="map" center={GRAND_CANYON} zoom={10}>
-        <TileLayer
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          eventHandlers={{ tileerror: () => setTilesFailed(true) }}
-        />
-      </MapContainer>
-    </main>
+      <main ref={main} tabIndex={-1}>
+        <route.View />
+      </main>
+    </div>
   )
 }

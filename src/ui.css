@@ -1,0 +1,87 @@
+/* Shared components. Values come only from tokens.css. */
+
+/* Simulation: a test-pattern chip. The stripes are decoration; the word carries the meaning. */
+.simulation {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-text);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+}
+.simulation::before {
+  content: '';
+  inline-size: var(--space-4);
+  block-size: var(--space-4);
+  border-radius: var(--radius-sm);
+  background: repeating-linear-gradient(-45deg, var(--color-text) 0 var(--space-1), transparent 0 var(--space-2));
+}
+
+/* Status badges: pill, tinted fill. Urgency tags: square corners and an outline, so the two never read as one set. */
+.badge,
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+  border: var(--border-width) solid currentColor;
+}
+.badge { border-radius: var(--radius-pill); }
+.tag { border-radius: var(--radius-sm); background: var(--color-surface); }
+
+.badge-unconfirmed { background: var(--color-neutral-bg); color: var(--color-neutral-fg); border-style: dashed; }
+.badge-cant_reach { background: var(--color-warning-bg); color: var(--color-warning-fg); }
+.badge-needs_assistance { background: var(--color-danger-bg); color: var(--color-danger-fg); }
+.badge-safe { background: var(--color-success-bg); color: var(--color-success-fg); }
+.badge-resolved { background: var(--color-info-bg); color: var(--color-info-fg); }
+
+.tag-immediate { background: var(--color-danger-bg); color: var(--color-danger-fg); }
+.tag-urgent { color: var(--color-warning-fg); }
+.tag-can_wait { color: var(--color-neutral-fg); }
+.tag-untriaged { color: var(--color-neutral-fg); border-style: dashed; }
+
+/* Check-in buttons: stacked and full width on a phone, side by side once there's room. */
+.check-in {
+  display: grid;
+  gap: var(--space-3);
+}
+@container (min-width: 28rem) {
+  .check-in { grid-template-columns: 1fr 1fr; }
+}
+.check-in-button {
+  min-block-size: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-on-solid);
+  font: inherit;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  cursor: pointer;
+  transition: scale 150ms ease-out;
+}
+.check-in-button:not(:disabled):active { scale: 0.96; }
+.check-in-safe { background: var(--color-success-solid); }
+.check-in-needs { background: var(--color-danger-solid); }
+@media (prefers-reduced-motion: reduce) {
+  .check-in-button { transition: none; }
+  .check-in-button:not(:disabled):active { scale: none; }
+}
+
+.source-line {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+.source-line time { font-variant-numeric: tabular-nums; white-space: nowrap; }
