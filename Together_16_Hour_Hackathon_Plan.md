@@ -1,5 +1,12 @@
 # Together: 16-Hour Hackathon Build and Presentation Plan
 
+> **Superseded in places (2026-10-30).** This plan is out of date. Go by [GLOSSARY.md](GLOSSARY.md), [docs/adr/](docs/adr/) and the spec instead. Main changes:
+> - Family members can't report people who never signed up; they go to law enforcement ([ADR-0002](docs/adr/0002-no-third-party-missing-person-reports.md)).
+> - "Responder" now means field crews; the Coordinator is a human at a desk.
+> - The AI now drafts Potential incidents and Urgency levels, and no longer links people.
+> - The submission is a 2–3 minute video, due 10:00 a.m. Saturday, not a live pitch. Feature freeze is 8:00 a.m.
+> - The track is Community.
+
 Prepared for a three-person team. This is a proposed build plan; the application and checks described here have not been implemented or run as part of this document.
 
 ## 1. The project you are building
