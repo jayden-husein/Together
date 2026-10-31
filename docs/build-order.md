@@ -6,7 +6,7 @@ The tickets are sub-issues of the spec, [#4](https://github.com/jayden-husein/To
 
 | Step | Tickets | Blocked by | Notes |
 | --- | --- | --- | --- |
-| 1 | [#5 App skeleton, deployed](https://github.com/jayden-husein/Together/issues/5) | none | Then a human imports the repo into Vercel. |
+| 1 | [#5 App skeleton, deployed](https://github.com/jayden-husein/Together/issues/5) | none | Done; live at <https://together-fdys.vercel.app>. |
 | 1 | [#16 README](https://github.com/jayden-husein/Together/issues/16) | none | Draft now; fill in results at freeze. |
 | 2 | [#6 Shared data and access rules](https://github.com/jayden-husein/Together/issues/6) | #5 | Run `scripts/setup-staging.sh` first. |
 | 2 | [#17 Visual direction and shared UI](https://github.com/jayden-husein/Together/issues/17) | #5 | Runs in parallel with #6. |
@@ -55,11 +55,12 @@ Every PR gets its own preview URL, posted as a comment on the PR. Previews must 
 
 Vercel deploys only the app, not the database. A PR that adds a migration must push it to staging itself, or its preview runs against the old schema: `set -a; source .env; set +a; npx supabase db push --db-url "$STAGING_DB_URL"`.
 
-## Suggested split for three people
+## Split for two people
 
-- **Person A (UI):** #17, then the UI side of #7, then #8, #9 and #15.
-- **Person B (data):** #5, #6, #7, then #10 and #12, the critical path.
-- **Person C (AI):** #16, then #14 and #11 once #7 and #10 close, then #13.
+- **Person A (critical path):** #6, #7, #10, #12, #13. Hand the UI side of #7 to Person B once #17 lands.
+- **Person B (everything else):** #16 and #17 first, then the UI side of #7. After #7, in this order: #8, #11 (once #10 closes), #9, then #14 and #15 only if time allows; the cut times below still apply.
+
+Whoever is free first takes the other's next unblocked ticket. Nothing should wait on the critical path.
 
 ## Schedule (Saturday)
 
