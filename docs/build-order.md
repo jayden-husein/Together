@@ -53,6 +53,8 @@ Every PR gets its own preview URL, posted as a comment on the PR. Previews must 
 3. Push any commit to redeploy; variable changes only apply to new deploys.
 4. Check: open a PR's preview, sign in as a demo Account, change something, and confirm it appears in the **staging** dashboard, not in production.
 
+Vercel deploys only the app, not the database. A PR that adds a migration must push it to staging itself, or its preview runs against the old schema: `set -a; source .env; set +a; npx supabase db push --db-url "$STAGING_DB_URL"`.
+
 ## Suggested split for three people
 
 - **Person A (UI):** #17, then the UI side of #7, then #8, #9 and #15.
